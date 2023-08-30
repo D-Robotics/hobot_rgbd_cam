@@ -68,7 +68,8 @@ class ShyCam : public CVideoComm {
     void SetSaveData(bool bSave) { m_bSave = bSave; }   // 查询当前存储图片使用状态
     int CalcTofSync(TTofRgbResult *pOutTofRes);
     bool ReadCalibrationFile(sensor_msgs::msg::CameraInfo& cam_info, const std::string &file_path);
-    
+    int GetValidUse();
+
     bool is_capturing() { return m_nDevStat == enDEV_START; }
 
  private:
@@ -89,7 +90,7 @@ class ShyCam : public CVideoComm {
     // 如果 一个在写，另一个读不到，这个时候，可能要等到 下一个轮，所以，缓冲区放大一倍
     TShyStreamData m_arrRecvStrmData[BUF_DEPTH * 2];
     // 得到可写的索引
-    int GetValidUse();
+
     mutable std::mutex m_mutxUseIdx;
     // 得到可读的索引
     int GetValidSave();

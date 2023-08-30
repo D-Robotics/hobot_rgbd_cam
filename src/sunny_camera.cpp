@@ -73,7 +73,7 @@ unsigned int guiSendCalibCnt = 0;
 RGBD_PROCESS_CB_S gstRgbdPocessCb;
 unsigned char au8RgbBuf[RGB_SIZE];
 static unsigned char gaucFirmwareVerion[4] = {1, 2, 0, 0};
-
+float depth2rgb_buf[480*270] = {0};
 
 int Init_ShyCamera()
 {
@@ -194,19 +194,12 @@ int ReleaseFrame_ShyCamera(TShyFrame *pDataOut)
     }
     return 0;
 }
-extern uint32_t get_tick_count();
+// extern uint32_t get_tick_count();
 #ifdef CV_CONVERT_CLR
 #include <opencv2/opencv.hpp>
 #endif
 static IMAGE_DATA_INFO_S s_stBgr888DataInfo;
-int ReleaseTofResult(TTofRgbResult* pDataOut)
-{
-    if (pDataOut) {
-        if (pDataOut->mOriRes.pU8Graydata)
-            delete []pDataOut->mOriRes.pU8Graydata;
-    }
-    return 0;
-}
+
 int Calc_Depth2Tof(void *pCamHdl, TShyFrame *pDataDepthIn, const TShyFrame *pDataYuvIn, TTofRgbResult* pDataOut)
 {
     IMAGE_DATA_INFO_S stTofRawDataInfo;
@@ -220,18 +213,18 @@ int Calc_Depth2Tof(void *pCamHdl, TShyFrame *pDataDepthIn, const TShyFrame *pDat
     stTofRawDataInfo.uiFrameCnt = pDataDepthIn->uiFrameCnt;
     stTofRawDataInfo.ePixelFormat = PIXEL_FORMAT_RAW;
 
-    uint32_t startTm = get_tick_count();
+    // uint32_t startTm = get_tick_count();
     // ROS_printf(2, "[wuwl-%s]->start dSz=%d,w:h=%d:%d.\n", __func__, pDataDepthIn->size,
     //  pDataDepthIn->width, pDataDepthIn->height);
-    int iRet = TofDepthProcessExp(pCamHdl, &stTofRawDataInfo, &stTmpDepthInfo, 0);
+    int iRet = TofDepthProcess(pCamHdl, &stTofRawDataInfo, &stTmpDepthInfo);
     if (0 != iRet) {
         ROS_printf(0, "[wuwl-%s]->err depSz=%d,yuvSz=%d, ret=%d.\n", __func__, pDataDepthIn->size,
          pDataYuvIn->size, iRet);
         return -100;
     }
-    uint32_t endTm = get_tick_count();
+    // uint32_t endTm = get_tick_count();
     // ROS_printf(2, "[wuwl-TofDepthProcess]->laps %d ms ret=%d.\n", endTm - startTm, iRet);
-    startTm = endTm;
+    // startTm = endTm;
     UINT32 frameWidth = stTmpDepthInfo.frameWidth;
     UINT32 frameHeight = stTmpDepthInfo.frameHeight;
 
@@ -240,49 +233,79 @@ int Calc_Depth2Tof(void *pCamHdl, TShyFrame *pDataDepthIn, const TShyFrame *pDat
     pDataOut->mOriRes.frameWidth = stTmpDepthInfo.frameWidth;
     pDataOut->mOriRes.frameHeight = stTmpDepthInfo.frameHeight;
     pDataOut->mOriRes.pfPointData = reinterpret_cast<TPointData*>(stTmpDepthInfo.pfPointData);
-    pDataOut->mOriRes.grayFormat = (EGRAY_FORMAT)stTmpDepthInfo.grayFormat;
-    pDataOut->mOriRes.pGrayData = stTmpDepthInfo.pGrayData;
-    // 外部灰度图用的 是 u8 方式，所以，这里转为u8 即可。
-    TofGray2U8(stTmpDepthInfo.pGrayData, stTmpDepthInfo.frameWidth, stTmpDepthInfo.frameHeight,
-        stTmpDepthInfo.grayFormat, &pDataOut->mOriRes.pU8Graydata);
-
-    pDataOut->mOriRes.pu16GrayData = stTmpDepthInfo.pu16GrayData;
+    pDataOut->mOriRes.pU8Graydata = stTmpDepthInfo.pu8GrayData;
     pDataOut->mOriRes.pu16Confidence = stTmpDepthInfo.pu16Confidence;
     pDataOut->mOriRes.pfNoise = stTmpDepthInfo.pfNoise;
     pDataOut->mOriRes.pDepthData = stTmpDepthInfo.pDepthData;
 
 #ifdef CV_CONVERT_CLR
-    cv::Mat imgTmp;
+    // cv::Mat imgTmp;
     cv::Mat yuvImg = cv::Mat(RGB_HEIGHT * 3 / 2, RGB_WIDTH, CV_8UC1, pDataYuvIn->pucImageData, 0);
-    cv::cvtColor(yuvImg, imgTmp, cv::COLOR_YUV2BGR_NV12);
-    memcpy(au8RgbBuf, imgTmp.data, RGB_HEIGHT * 3 * RGB_WIDTH);
+    cv::cvtColor(yuvImg, pDataOut->mImageColor, cv::COLOR_YUV2BGR_NV12);
+    // memcpy(au8RgbBuf, imgTmp.data, RGB_HEIGHT * 3 * RGB_WIDTH);
 #else
     nv12_to_bgr888_buffer(pDataYuvIn->pucImageData, au8RgbBuf, RGB_WIDTH, RGB_HEIGHT);
 #endif
-    endTm = get_tick_count();
-    pDataOut->mOutRgb = au8RgbBuf;
+    // endTm = get_tick_count();
+    // pDataOut->mOutRgb = au8RgbBuf;
     // ROS_printf(2, "[wuwl-nv12_to_bgr888_buffer]->sz=%d,w:h=%d:%d,laps %d ms ret=%d.\n",
     //  pDataYuvIn->size, pDataYuvIn->width, pDataYuvIn->height, endTm - startTm, iRet);
-    startTm = endTm;
-    s_stBgr888DataInfo.pucImageData = au8RgbBuf;
+    // startTm = endTm;
+    s_stBgr888DataInfo.pucImageData = pDataOut->mImageColor.data;
     s_stBgr888DataInfo.uiImageSize = RGB_SIZE;
     s_stBgr888DataInfo.ePixelFormat = PIXEL_FORMAT_RGB;
     s_stBgr888DataInfo.uiFrameCnt = pDataYuvIn->uiFrameCnt;
     s_stBgr888DataInfo.timeStamp = pDataYuvIn->timeStamp;
 
     stTofRgbdInput.pPointCloud = reinterpret_cast<TofRgbdPointCloud*>(stTmpDepthInfo.pfPointData);
-    stTofRgbdInput.pGray       = stTmpDepthInfo.pGrayData;
-    stTofRgbdInput.nGrayLen    = frameWidth * frameHeight * CaculateGrayPixelBytes(stTmpDepthInfo.grayFormat);
+    stTofRgbdInput.pGray       = stTmpDepthInfo.pu8GrayData;
     stTofRgbdInput.pRgb        = s_stBgr888DataInfo.pucImageData;
     stTofRgbdInput.nRgbLen     = s_stBgr888DataInfo.uiImageSize;
 
     iRet = TofRgbdProcess(pCamHdl, &stTofRgbdInput, &stTofRgbdOut);
-    endTm = get_tick_count();
+    // endTm = get_tick_count();
     // ROS_printf(2, "[wuwl-TofRgbdProcess]->laps %d ms,w:h=%d:%d ret=%d.\n", endTm - startTm,
     // frameWidth, frameHeight, iRet);
     pDataOut->mPclRgb.pData = reinterpret_cast<TofRgbdPointClr*>(stTofRgbdOut.colorPointCloud.pData);
     pDataOut->mPclRgb.nWidth = stTofRgbdOut.colorPointCloud.nWidth;
     pDataOut->mPclRgb.nHeight = stTofRgbdOut.colorPointCloud.nHeight;
+
+    // pDataOut->mOriDepth.pData = stTofRgbdOut.depth2rgb.pData;
+    pDataOut->mOriDepth.nWidth = stTofRgbdOut.depth2rgb.nWidth;
+    pDataOut->mOriDepth.nHeight = stTofRgbdOut.depth2rgb.nHeight;
+    pDataOut->mOriDepth.pData = depth2rgb_buf;
+
+    memcpy(pDataOut->mOriDepth.pData, stTofRgbdOut.depth2rgb.pData, stTofRgbdOut.depth2rgb.nWidth * stTofRgbdOut.depth2rgb.nHeight * sizeof(float));
+    memset(stTofRgbdOut.depth2rgb.pData, 0, stTofRgbdOut.depth2rgb.nWidth * stTofRgbdOut.depth2rgb.nHeight * sizeof(float));
+
+    // printf("rgb2Tof nDataLen %d, (%d, %d), pData %p\n", stTofRgbdOut.rgb2Tof.nDataLen, stTofRgbdOut.rgb2Tof.nWidth, stTofRgbdOut.rgb2Tof.nHeight, stTofRgbdOut.rgb2Tof.pData);
+    // printf("gray2Rgb (%d, %d), pData %p\n", stTofRgbdOut.gray2Rgb.nWidth, stTofRgbdOut.gray2Rgb.nHeight, stTofRgbdOut.gray2Rgb.pData);
+    // printf("pointCloud2Rgb nDataLen (%d, %d), pData %p\n", stTofRgbdOut.pointCloud2Rgb.nWidth, stTofRgbdOut.pointCloud2Rgb.nHeight, stTofRgbdOut.pointCloud2Rgb.pData);
+    // printf("colorPointCloud nDataLen (%d, %d), pData %p\n", stTofRgbdOut.colorPointCloud.nWidth, stTofRgbdOut.colorPointCloud.nHeight, stTofRgbdOut.colorPointCloud.pData);
+    // printf("rgb2TofPixelCoord nDataLen (%d, %d), pData %p\n", stTofRgbdOut.rgb2TofPixelCoord.nWidth, stTofRgbdOut.rgb2TofPixelCoord.nHeight, stTofRgbdOut.rgb2TofPixelCoord.pData);
+    // printf("privData nDataLen %d, pData %p\n", stTofRgbdOut.privData.nDataLen, stTofRgbdOut.privData.pData);
+
+    // printf("depth2rgb (%d, %d), pData %p\n", stTofRgbdOut.depth2rgb.nWidth, stTofRgbdOut.depth2rgb.nHeight, stTofRgbdOut.depth2rgb.pData);
+
+    // static int dep_frame_countttt = 0;
+    // dep_frame_countttt++;
+    // if (dep_frame_countttt == 60) {
+    //   std::ofstream file("depth_depth2rgb_data.txt");
+    //   if (file.is_open()) {
+    //     auto float_data = stTofRgbdOut.depth2rgb.pData;
+    //     for (int i = 0; i < stTofRgbdOut.depth2rgb.nWidth *
+    //                             stTofRgbdOut.depth2rgb.nHeight;
+    //          i++) {
+    //       file << *float_data << std::endl;
+    //       float_data++;
+    //     }
+    //     file.close();
+    //     std::cout << "Data written to depth_depth2rgb_data.txt"
+    //               << std::endl;
+    //   } else {
+    //     std::cout << "Failed to open file" << std::endl;
+    //   }
+    // }
 
     return iRet;
 }

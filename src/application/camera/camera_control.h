@@ -22,7 +22,6 @@
 #include <stdio.h>
 
 #include "tof_i2c.h"
-#include "typedef.h"
 #include "tof_mod_sdk.h"
 #ifdef RGBD
 #include "tof_rgbd_sdk.h"
@@ -122,6 +121,7 @@ int GetSensorID(void *pCamHandle, unsigned short au16SensorID[4]);
 unsigned int GetSupportTofFilter(void *pCamHandle);
 int GetTofFilterStatus(void *pCamHandle, unsigned int *puiEnableTypeList, unsigned int *puiDisableTypeList);
 int SetTofFilterStatus(void *pCamHandle, unsigned int *puiEnableTypeList, unsigned int *puiDisableTypeList);
+int GetRgbdCalibData(void *pCamHandle, unsigned char *pu8CalibData, unsigned int *pu32CalibDataSize);
 
 void yuv_to_rgb_table_init(void);
 void nv12_to_bgr888_buffer(unsigned char *yuv, unsigned char *rgb, int width, int height);

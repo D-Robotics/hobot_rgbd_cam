@@ -85,7 +85,7 @@ add_executable(${PROJECT_NAME}
   src/sunny_camera.cpp
   
   src/application/camera/camera_control.cpp
-  src/application/camera/camera_hb_cfg.cpp
+  src/application/camera/camera_cfg.cpp
   
   src/application/horizon_mpp/horizon_mpp.cpp
   src/application/i2c/tof_i2c.cpp
@@ -119,6 +119,31 @@ install(
   TARGETS ${PROJECT_NAME}
   RUNTIME DESTINATION lib/${PROJECT_NAME}
 )
+
+
+
+## Build the mipi camera library
+add_executable(sunny_camera_test
+  src/test/sunny_camera_test.cpp
+
+  src/application/camera/camera_control.cpp
+  src/application/camera/camera_cfg.cpp
+  src/application/horizon_mpp/horizon_mpp.cpp
+  src/application/i2c/tof_i2c.cpp
+  src/application/tof_depth/tof_depth_process.cpp
+)
+
+target_link_libraries(sunny_camera_test
+  ${BASE_LIBRARIES} ${X3_HAPI_LIB} opencv_world
+)
+
+install(
+  TARGETS sunny_camera_test
+  RUNTIME DESTINATION lib/${PROJECT_NAME}
+)
+
+
+
 install(FILES
   ${CMAKE_CURRENT_SOURCE_DIR}/src/TOF_SDK/libs/libtof_mod_sdk.so
   ${CMAKE_CURRENT_SOURCE_DIR}/src/TOF_SDK/libs/libtof_rgbd_sdk.so

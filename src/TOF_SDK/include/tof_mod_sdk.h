@@ -1,8 +1,7 @@
-#ifndef __TOF_MODULE_H__
-#define __TOF_MODULE_H__
+#ifndef __TOF_MODULE_SDK_H__
+#define __TOF_MODULE_SDK_H__
 
-#include "typedef.h"
-#include "tof_error.h"
+#include "tof_sdk_typedef.h"
 
 #ifdef WIN32
     #ifdef TOF_MODULE_SDK_EXPORT
@@ -22,28 +21,39 @@ typedef struct tagTofModuleInitParam
 
 }TofModuleInitParam;
 
-typedef struct tagTofModuleCaps
-{	
-	UINT32 supportedTOFMode;//TOF_MODE的组合
-	UINT32 tofResWidth;
-	UINT32 tofResHeight;
-	GRAY_FORMAT grayFormat;//灰度数据格式
+typedef struct tagTofModuleCapability
+{
+	TOF_MODE tofMode;
+	UINT32 tofResWidth;//输出的数据的宽
+	UINT32 tofResHeight;//输出的数据的高
 
 	//TOF HDRZ
 	SBOOL bTofHDRZSupported;
-	UINT8 byRes1[3];//字节对齐，预留
 
 	//TOF RemoveINS
 	SBOOL bTofRemoveINSSupported;
-	//TOF MPIFlag
-	SBOOL bTofMPIFlagSupported;//[该字段已作废]
-	UINT8 byRes2[2];//字节对齐，预留
+
+	//TOF 多路径矫正
+	SBOOL bTofMpiCorrectSupported;
+
+	//TOF 多路径矫正结果和传统算法的融合
+	SBOOL bTofMpiFuseSupported;
 
 	//TOF Filter
 	UINT32 supportedTOFFilter; //TOF_FILTER的组合
 
-	//TOF Expouse
-	UINT32 supportedTofExpMode;//EXP_MODE的组合[该字段已作废]
+	//TOF滤波等级
+	SBOOL bTofFilterLevelSupported;
+	UINT8 nTofFilterLevelMin; //最小TOF滤波等级（宽松）
+	UINT8 nTofFilterLevelMax; //最大TOF滤波等级（严格）
+
+}TofModuleCapability;
+
+
+typedef struct tagTofModuleCaps
+{	
+	UINT32 capCnt; //实际使用的能力个数，不超过TOF_MAX_CAPS_CNT
+	TofModuleCapability cap[TOF_MAX_CAPS_CNT];//每一种模式下的能力
 
 }TofModuleCaps;
 
@@ -76,46 +86,6 @@ typedef enum tagMODULE_NAME
 
 	MODULE_NAME_LAST,//新增模组型号放在该枚举值之前（为了兼容，需按先后顺序添加，不得改变原有枚举取值）
 }MODULE_NAME;
-
-
-//模组SDK的客户识别号
-typedef enum tagMODULE_GUEST_ID
-{
-	MODULE_GUEST_ID_DEF = 0x00,//默认客户
-	MODULE_GUEST_ID_01  = 0x01,//客户01
-	MODULE_GUEST_ID_02  = 0x02,//客户02
-	MODULE_GUEST_ID_03  = 0x03,//客户03
-	MODULE_GUEST_ID_04  = 0x04,//客户04
-	MODULE_GUEST_ID_05  = 0x05,//客户05
-	MODULE_GUEST_ID_06  = 0x06,//客户06
-	MODULE_GUEST_ID_07  = 0x07,//客户07
-	MODULE_GUEST_ID_08  = 0x08,//客户08
-	MODULE_GUEST_ID_09  = 0x09,//客户09
-
-	MODULE_GUEST_ID_10  = 0x10,//客户10
-	MODULE_GUEST_ID_11  = 0x11,//客户11
-	MODULE_GUEST_ID_12  = 0x12,//客户12
-	MODULE_GUEST_ID_13  = 0x13,//客户13
-	MODULE_GUEST_ID_14  = 0x14,//客户14
-	MODULE_GUEST_ID_15  = 0x15,//客户15
-	MODULE_GUEST_ID_16  = 0x16,//客户16
-	MODULE_GUEST_ID_17  = 0x17,//客户17
-	MODULE_GUEST_ID_18  = 0x18,//客户18
-	MODULE_GUEST_ID_19  = 0x19,//客户19
-
-	MODULE_GUEST_ID_20  = 0x20,//客户20
-	MODULE_GUEST_ID_21  = 0x21,//客户21
-	MODULE_GUEST_ID_22  = 0x22,//客户22
-	MODULE_GUEST_ID_23  = 0x23,//客户23
-	MODULE_GUEST_ID_24  = 0x24,//客户24
-	MODULE_GUEST_ID_25  = 0x25,//客户25
-	MODULE_GUEST_ID_26  = 0x26,//客户26
-	MODULE_GUEST_ID_27  = 0x27,//客户27
-	MODULE_GUEST_ID_28  = 0x28,//客户28
-	MODULE_GUEST_ID_29  = 0x29,//客户29
-
-
-}MODULE_GUEST_ID;
 
 
 typedef void* HTOFM;
@@ -153,67 +123,35 @@ typedef struct tagTofModuleHal
 
 typedef struct tagTofModDepthData
 {
-	UINT64  timeStamp;
-	UINT32  frameWidth;
-	UINT32  frameHeight;
+	UINT32 frameWidth;//输出的数据的宽
+	UINT32 frameHeight;//输出的数据的高
 
-    //
+	//
 	FLOAT32* pDepthData;//射线距离（滤波前）
 	FLOAT32* pDepthDataFilter;//射线距离（滤波后）
 	//
-	PointData *pPointData;//点云数据
+	PointData* pPointData;//点云数据
+	PointData* pPointDataUnfilter;//点云数据（滤波前）
 	//
-	GRAY_FORMAT grayFormat;//pGrayData内数据格式
-	void   *pGrayData;//灰度数据
+	UINT8* pGrayData;//灰度数据
+	UINT8* pConfidence;//置信度数据
+	UINT8* pIntensity;//环境光数据
+	//
+	UINT8* pMaxValidPixelFlag;//最大有效像素标记
+
+	TofExpouseCurrentItems autoExp;//计算出的自动曝光值（当需要自动曝光效果时，需要将该值设置到模组中）
+
+	FLOAT32 temperature;//温度
+
+	UINT32 nPixelOffset;//相对于原始TOF数据分辨率下的数据,输出的数据跳过的像素个数
+
+	SBOOL bHighReflectDetected;//是否检测到高反物体
 
 	//扩展数据(一般针对客户特殊需求)，不同设备/不同客户均不同，可能为空；
-	void   *pExtData;//扩展数据
+	void*  pExtData;//扩展数据
 	UINT32 nExtDataLen;//pExtData内扩展数据长度，字节数
-
-	TofExpouseCurrentItems  autoExp;//计算出的自动曝光值（当需要自动曝光效果时，需要将该值设置到模组中）
 
 }TofModDepthData;
-
-
-
-typedef struct tagTofModDepthDataV20
-{
-	UINT64  timeStamp;
-	UINT32  frameWidth;
-	UINT32  frameHeight;
-
-	//
-	FLOAT32* pDepthData;//射线距离（滤波前）
-	FLOAT32* pDepthDataFilter;//射线距离（滤波后）
-	//
-	PointData *pPointData;//点云数据
-	//
-	GRAY_FORMAT grayFormat;//pGrayData内数据格式
-	void   *pGrayData;//灰度数据
-
-	//扩展数据(一般针对客户特殊需求)，不同设备/不同客户均不同，可能为空；
-	void   *pExtData;//扩展数据
-	UINT32 nExtDataLen;//pExtData内扩展数据长度，字节数
-
-	TofExpouseCurrentItems  autoExp;//计算出的自动曝光值（当需要自动曝光效果时，需要将该值设置到模组中）
-
-
-	/**************帧内HDRZ融合时特有数据************/
-
-	//计算出的自动曝光帧数据（中间数据）
-	FLOAT32* pDepthData_AEF;//射线距离
-	PointData *pPointData_AEF;//点云数据
-	GRAY_FORMAT grayFormat_AEF;//pGrayData_AEF内数据格式
-	void   *pGrayData_AEF;//灰度数据
-
-	//计算出的固定曝光帧数据（中间数据）
-	FLOAT32* pDepthData_FEF;//射线距离
-	PointData *pPointData_FEF;//点云数据
-	GRAY_FORMAT grayFormat_FEF;//pGrayData_FEF内数据格式
-	void   *pGrayData_FEF;//灰度数据
-
-
-}TofModDepthDataV20;
 
 
 typedef struct tagSomeCalibParam
@@ -237,7 +175,7 @@ extern "C" {
 /*********************第一部分：SDK基本接口（公用）**************************/
 /*****************************************************************************/
 
-//初始化/反初始化SDK（其他任何接口的使用都必须介于这两个接口之间）
+//初始化/反初始化SDK（其他任何接口的使用都必须介于这两个接口之间，只需要调用一次）
 TOFMDLL TOFRET TOFM_Init(TofModuleInitParam* pInitParam);
 TOFMDLL TOFRET TOFM_Uninit(void);
 
@@ -251,9 +189,11 @@ TOFMDLL HTOFM  TOFM_OpenDevice(const MODULE_NAME mod_name, TofModuleHal* pHal, v
 TOFMDLL HTOFM  TOFM_OpenDeviceV20(SCHAR* pModName, TofModuleHal* pHal, void* pHalUserData, TofModuleCaps* pCaps);
 //新接口（兼容老接口，但是MODULE_NAME枚举不支持的模组型号一定要用新接口，相对于V20接口，可以实现不同客户对同一模组的不同数据需求）
 TOFMDLL HTOFM  TOFM_OpenDeviceV30(SCHAR* pModName, const MODULE_GUEST_ID guestID, TofModuleHal* pHal, void* pHalUserData, TofModuleCaps* pCaps);
+//新接口（无法兼容老接口）
+TOFMDLL HTOFM  TOFM_OpenDeviceV40(TofModuleDescriptor* pModDesc, TofModuleHal* pHal, void* pHalUserData, TofModuleCaps* pCaps);
 TOFMDLL TOFRET TOFM_CloseDevice(HTOFM hTofMod);
 
-//绑定TOF 模式（关系到后续的标定数据解析、深度计算初始化和取流功能）
+//绑定TOF 模式（关系到后续的标定数据解析、深度计算初始化）
 //老接口（采用默认的配置文件）
 TOFMDLL TOFRET TOFM_SetTofMode(HTOFM hTofMod, const TOF_MODE tofMode);
 //新接口（可以重新指定配置文件）, pModCfgFile为配置文件完整路径并且可以为NULL值（NULL时表示采用默认配置文件）
@@ -267,46 +207,30 @@ TOFMDLL TOFRET TOFM_SetExterntionHooks(HTOFM hTofMod, ExterntionHooks* pHooks);
 /*********************第二部分：该部分为模组硬件相关操作（硬件交互）**********/
 /*****************************************************************************/
 
-//从模组里读取标定数据
-TOFMDLL UINT32 TOFM_ReadCalibData(HTOFM hTofMod, UINT8* pCalibData, const UINT32 nBufLen);
-//获取/设置模组曝光
-TOFMDLL TOFRET TOFM_GetTofExpTime(HTOFM hTofMod, TofExpouseItems* pExp);
+//设置模组曝光
 TOFMDLL TOFRET TOFM_SetTofExpTime(HTOFM hTofMod, TofExpouseCurrentItems* pExp);
 //获取模组温度
 TOFMDLL TOFRET TOFM_GetTemperature(HTOFM hTofMod, FLOAT32* pTemperature);
-//开启/关闭模组MIPI出流
-TOFMDLL TOFRET TOFM_StartTofStream(HTOFM hTofMod);
-TOFMDLL TOFRET TOFM_StopTofStream(HTOFM hTofMod);
 
 
 /*****************************************************************************/
-/*********************第三部分：该部分为深度计算相关算法（软件算法）**********/
+/*********************第三部分：该部分为深度计算相关算法（软件算法）************/
+/****该部分其他接口借用时必须介于TOFM_InitDepthCal、TOFM_UnInitDepthCal之间****/
 /*****************************************************************************/
 
-//解析/释放标定数据
-TOFMDLL TOFRET TOFM_LoadCalibData(HTOFM hTofMod, UINT8* pCalibData, const UINT32 nCalibDataLen);
-TOFMDLL TOFRET TOFM_UnLoadCalibData(HTOFM hTofMod);
-//读取标定数据内部分标定参数
-TOFMDLL TOFRET TOFM_GetSomeCalibParam(HTOFM hTofMod, SomeCalibParam* pParamOut); //（该接口必须在TOFM_LoadCalibData之后，TOFM_UnLoadCalibData之前调用）
-
-//深度计算模块（该部分必须在TOFM_LoadCalibData之后，TOFM_UnLoadCalibData之前调用）
-TOFMDLL TOFRET TOFM_InitDepthCal(HTOFM hTofMod);//(比较耗时)
+//深度计算模块
+TOFMDLL TOFRET TOFM_InitDepthCal(HTOFM hTofMod, UINT8* pCalibData, const UINT32 nCalibDataLen);//(比较耗时)
 TOFMDLL TOFRET TOFM_UnInitDepthCal(HTOFM hTofMod);
-TOFMDLL TOFRET TOFM_DoDepthCal(HTOFM hTofMod, TofRawData* pRawData, TofModDepthData* pDataOut);//（该接口必须在TOFM_InitDepthCal之后，TOFM_UnInitDepthCal之前调用）
-TOFMDLL TOFRET TOFM_DoDepthCalV20(HTOFM hTofMod, TofRawData* pRawData, TofModDepthDataV20* pDataOut);//（该接口必须在TOFM_InitDepthCal之后，TOFM_UnInitDepthCal之前调用）
 
-TOFMDLL TOFRET TOFM_DoDepthCalV20_OnlyAEExp(HTOFM hTofMod, TofRawData* pRawData, TofModDepthDataV20* pDataOut);//（该接口必须在TOFM_InitDepthCal之后，TOFM_UnInitDepthCal之前调用）
-TOFMDLL TOFRET TOFM_DoDepthCalV20_OnlyDepth(HTOFM hTofMod, TofRawData* pRawData, TofModDepthDataV20* pDataOut);//（该接口必须在TOFM_InitDepthCal之后，TOFM_UnInitDepthCal之前调用）
+TOFMDLL TOFRET TOFM_DetectMultiDevInterference(HTOFM hTofMod, TofRawData* pRawData, MULTI_DEV_INTERFERENCE* pInterference);
+TOFMDLL TOFRET TOFM_DoDepthCal(HTOFM hTofMod, TofRawData* pRawData, TofModDepthData* pDataOut);
 
-
-//启用/禁用AE算法[已弃用]
-TOFMDLL TOFRET TOFM_SetTofAE(HTOFM hTofMod, const SBOOL bEnable);
+//获取/设置滤波等级，取值范围:[TofModuleCapability的nTofFilterLevelMin, nTofFilterLevelMax]
+TOFMDLL TOFRET TOFM_GetTofFilterLevel(HTOFM hTofMod, UINT32* pnLevel);
+TOFMDLL TOFRET TOFM_SetTofFilterLevel(HTOFM hTofMod, const UINT32 nLevel);
 //启用/禁用某种滤波算法
 TOFMDLL TOFRET TOFM_GetTofFilter(HTOFM hTofMod, const TOF_FILTER type, SBOOL* pbEnable);
 TOFMDLL TOFRET TOFM_SetTofFilter(HTOFM hTofMod, const TOF_FILTER type, const SBOOL bEnable);
-//启用/禁用某种滤波算法（带具体参数）
-TOFMDLL TOFRET TOFM_GetTofFilterV20(HTOFM hTofMod, TofFilterCfg* pCfg);
-TOFMDLL TOFRET TOFM_SetTofFilterV20(HTOFM hTofMod, TofFilterCfg* pCfg);
 
 //启用/禁用HDRZ算法
 TOFMDLL TOFRET TOFM_SetTofHDRZ(HTOFM hTofMod, const SBOOL bEnable);
@@ -314,23 +238,22 @@ TOFMDLL TOFRET TOFM_SetTofHDRZ(HTOFM hTofMod, const SBOOL bEnable);
 //启用/禁用RemoveINS算法
 TOFMDLL TOFRET TOFM_SetTofRemoveINS(HTOFM hTofMod, const SBOOL bEnable);
 
-//启用/禁用MPIFlag算法[已弃用，请使用TOFM_SetTofFilter(xxx, TOF_FILTER_MPIFilter, xxx)]
-TOFMDLL TOFRET TOFM_SetTofMPIFlag(HTOFM hTofMod, const SBOOL bEnable);
+//启用/禁用多路径矫正
+TOFMDLL TOFRET TOFM_SetTofMpiCorrect(HTOFM hTofMod, const SBOOL bEnable);
 
-//调整raw数据的格式（非必须函数，按需调用，常见于嵌入式平台下大小端转换）
-TOFMDLL TOFRET TOFM_ConvertRawData(HTOFM hTofMod, UINT8* pRaw, const UINT32 nRawLen, UINT8* pRawOut, const UINT32 nOutBufLen);
+//启用/禁用多路径矫正结果和传统算法的融合
+TOFMDLL TOFRET TOFM_SetTofMpiFuse(HTOFM hTofMod, const SBOOL bEnable);
+
+//读取标定数据内部分标定参数（非必须函数，按需调用）
+TOFMDLL TOFRET TOFM_GetSomeCalibParam(HTOFM hTofMod, SomeCalibParam* pParamOut);
 
 //调整深度计算的ROI（非必须函数，按需调用）
 TOFMDLL TOFRET TOFM_GetDepthCalRoi(HTOFM hTofMod, DepthCalRoi* pRoi);
 TOFMDLL TOFRET TOFM_SetDepthCalRoi(HTOFM hTofMod, DepthCalRoi* pRoi);
 
-//获取/调整曝光上下限（非必须函数，按需调用）
+//获取曝光上下限（非必须函数，按需调用）
 TOFMDLL TOFRET TOFM_GetTofExpTimeRange(HTOFM hTofMod, TofExpouseRangeItems* pRange);
-TOFMDLL TOFRET TOFM_SetTofExpTimeRange(HTOFM hTofMod, TofExpouseRangeItems* pRange);
 
-//获取/调整客户们自定义要求的数据（非必须函数，按需调用）
-TOFMDLL TOFRET TOFM_GetGuestCustomParam(HTOFM hTofMod, GuestCustomParam* pParam);
-TOFMDLL TOFRET TOFM_SetGuestCustomParam(HTOFM hTofMod, GuestCustomParam* pParam);
 
 
 

@@ -15,117 +15,113 @@
 #ifndef __SUNNY_CAMERA_H__
 #define __SUNNY_CAMERA_H__
 
+#include <opencv2/opencv.hpp>
+
 typedef struct _tag_shyFrame {
-    // unsigned long long timeStamp;
-    int64_t timeStamp;
-    int fcc;
-    unsigned char *pucImageData;
-    int width;
-    int height;
-    int size;
-    unsigned int uiFrameCnt;
-}TShyFrame;
+  // unsigned long long timeStamp;
+  uint64_t timeStamp;
+  int fcc;
+  unsigned char *pucImageData;
+  int width;
+  int height;
+  int size;
+  unsigned int uiFrameCnt;
+} TShyFrame;
 
 // 灰度数据格式
-typedef enum tag_GRAY_FORMAT
-{
-    EGRAY_FORMAT_UINT8  = 0,  // 8位数据
-    EGRAY_FORMAT_UINT16,  // 无符号16位数据
-    EGRAY_FORMAT_FLOAT,  // 浮点型数据
-    EGRAY_FORMAT_BGRD,  // 每像素32位， 按B/G/R/D顺序存放
-}EGRAY_FORMAT;
+typedef enum tag_GRAY_FORMAT {
+  EGRAY_FORMAT_UINT8 = 0,  // 8位数据
+  EGRAY_FORMAT_UINT16,     // 无符号16位数据
+  EGRAY_FORMAT_FLOAT,      // 浮点型数据
+  EGRAY_FORMAT_BGRD,       // 每像素32位， 按B/G/R/D顺序存放
+} EGRAY_FORMAT;
 
-typedef struct tag_PointData
-{
-    float x;
-    float y;
-    float z;
-}TPointData;
+typedef struct tag_PointData {
+  float x;
+  float y;
+  float z;
+} TPointData;
 
 // TOF模组内参和畸变（通用模型）
-typedef struct tagTofMdlLensGeneral
-{
-    float fx;
-    float fy;
-    float cx;
-    float cy;
-    float k1;
-    float k2;
-    float p1;
-    float p2;
-    float k3;
-}TTofMdlLensGeneral;
+typedef struct tagTofMdlLensGeneral {
+  float fx;
+  float fy;
+  float cx;
+  float cy;
+  float k1;
+  float k2;
+  float p1;
+  float p2;
+  float k3;
+} TTofMdlLensGeneral;
 
 // TOF模组内参和畸变（鱼眼模型）
-typedef struct tagTofMdlLensFishEye
-{
-    float fx;
-    float fy;
-    float cx;
-    float cy;
-    float k1;
-    float k2;
-    float k3;
-    float k4;
-}TTofMdlLensFishEye;
-typedef struct tag_CamInfo
-{
-    unsigned int nIdx;  // 1---general有效, 2---fishEye有效
+typedef struct tagTofMdlLensFishEye {
+  float fx;
+  float fy;
+  float cx;
+  float cy;
+  float k1;
+  float k2;
+  float k3;
+  float k4;
+} TTofMdlLensFishEye;
 
-    union
-    {
-        // [第1种]: 普通模型
-        TTofMdlLensGeneral general;  // 普通模型
+typedef struct tag_CamInfo {
+  unsigned int nIdx;  // 1---general有效, 2---fishEye有效
 
-        // [第2种]: 鱼眼模型
-        TTofMdlLensFishEye fishEye;  // 鱼眼模型
-    }uParam;
-}TCameraParam;
+  union {
+    // [第1种]: 普通模型
+    TTofMdlLensGeneral general;  // 普通模型
 
-typedef struct tof_depth_data
-{
-    // unsigned long long  timeStamp;  // 时间戳
-    int64_t timeStamp;
-    unsigned int  uiFrameCnt;  // 帧计数
-    unsigned int  frameWidth;  // 深度图宽度
-    unsigned int  frameHeight;  // 深度图高度
-    TPointData *pfPointData;  // 点云数据
-    EGRAY_FORMAT grayFormat;  // pGrayData内数据格式
-    void   *pGrayData;  // 灰度数据
-    void   *pU8Graydata;  // u8 灰度图 ,wuwl
-    // unsigned short *pu16GrayData;  // u16灰度数据
-    uint16_t *pu16GrayData;
-    // unsigned short *pu16Confidence;  // 置信度
-    uint16_t *pu16Confidence;
-    float *pfNoise;  // 噪声
-    float* pDepthData;  // 射线距离
+    // [第2种]: 鱼眼模型
+    TTofMdlLensFishEye fishEye;  // 鱼眼模型
+  } uParam;
+} TCameraParam;
+
+typedef struct tof_depth_data {
+  uint64_t timeStamp;    // 时间戳
+  uint32_t uiFrameCnt;   // 帧计数
+  uint32_t frameWidth;   // 深度图宽度
+  uint32_t frameHeight;  // 深度图高度
+  TPointData *pfPointData;   // 点云数据
+  uint8_t *pU8Graydata;         // u8 灰度图 ,wuwl
+  uint16_t *pu16Confidence;
+  float *pfNoise;     // 噪声
+  float *pDepthData;  // 射线距离
 } TofDepth_Info;
 
 // 彩色点云
-typedef struct tagTofRgbdPointClr
-{
-    float x;
-    float y;
-    float z;
+typedef struct tagTofRgbdPointClr {
+  float x;
+  float y;
+  float z;
 
-    float r;
-    float g;
-    float b;
-}TofRgbdPointClr;
+  float r;
+  float g;
+  float b;
+} TofRgbdPointClr;
 
 // 彩色点云图像信息
-typedef struct tagTofRgbd_PCDColor
-{
-    TofRgbdPointClr* pData;  // 数据总长：nWidth * nHeight * sizeof(pData[0])
-    unsigned int            nWidth;
-    unsigned int            nHeight;
-}TTofRgb_PCDClr;
-typedef struct tagTofRgbd_Res
-{
-    void * mOutRgb;
-    TofDepth_Info mOriRes;
-    TTofRgb_PCDClr mPclRgb;
-}TTofRgbResult;
+typedef struct tagTofRgbd_PCDColor {
+  TofRgbdPointClr *pData;  // 数据总长：nWidth * nHeight * sizeof(pData[0])
+  unsigned int nWidth;
+  unsigned int nHeight;
+} TTofRgb_PCDClr;
+
+typedef struct tagTofRgbd_depth {
+  float *pData;  // 数据总长：nWidth * nHeight * sizeof(pData[0])
+  unsigned int nWidth;
+  unsigned int nHeight;
+} TofRgbDepth;
+
+typedef struct tagTofRgbd_Res {
+  void *mOutRgb;
+  TofDepth_Info mOriRes;
+  TTofRgb_PCDClr mPclRgb;
+  TofRgbDepth  mOriDepth;
+  cv::Mat mImageColor;
+} TTofRgbResult;
 
 #ifdef __cplusplus
 extern "C" {
@@ -136,7 +132,7 @@ extern int ROS_printf(int nLev, char *fmt, ...);
 // 回调函数
 int Init_ShyCamera();
 int Uninit_ShyCamera();
-void* Open_ShyCamera(int nCamType);
+void *Open_ShyCamera(int nCamType);
 int Start_ShyCamera(void *pCamHdl);
 int Stop_ShyCamera(void *pCamHdl);
 int Close_ShyCamera(void **pCamHdl);
@@ -144,10 +140,11 @@ int Close_ShyCamera(void **pCamHdl);
 
 int GetFrame_ShyCamera(void *pCamHdl, TShyFrame *pDataOut);
 int ReleaseFrame_ShyCamera(TShyFrame *pDataOut);
-int Get_ShyCameraInfo(void *pCamHdl, TCameraParam* pOutInfo);
+int Get_ShyCameraInfo(void *pCamHdl, TCameraParam *pOutInfo);
 // TOF 计算接口
-int Calc_Depth2Tof(void *pCamHdl, TShyFrame *pDataDepthIn, const TShyFrame *pDataRgbIn, TTofRgbResult* pDataOut);
-int ReleaseTofResult(TTofRgbResult* pDataOut);
+int Calc_Depth2Tof(void *pCamHdl, TShyFrame *pDataDepthIn,
+                   const TShyFrame *pDataRgbIn, TTofRgbResult *pDataOut);
+int ReleaseTofResult(TTofRgbResult *pDataOut);
 // 计算融合
 
 #ifdef __cplusplus

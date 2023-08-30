@@ -49,6 +49,12 @@ typedef enum tagTOFRGBD_GUEST_ID
 	TOFRGBD_GUEST_ID_07 = 0x07,//客户07
 	TOFRGBD_GUEST_ID_08 = 0x08,//客户08
 	TOFRGBD_GUEST_ID_09 = 0x09,//客户09
+	TOFRGBD_GUEST_ID_0A = 0x0A,//客户0A
+	TOFRGBD_GUEST_ID_0B = 0x0B,//客户0B
+	TOFRGBD_GUEST_ID_0C = 0x0C,//客户0C
+	TOFRGBD_GUEST_ID_0D = 0x0D,//客户0D
+	TOFRGBD_GUEST_ID_0E = 0x0E,//客户0E
+	TOFRGBD_GUEST_ID_0F = 0x0F,//客户0F
 
 	TOFRGBD_GUEST_ID_10 = 0x10,//客户10
 	TOFRGBD_GUEST_ID_11 = 0x11,//客户11
@@ -60,6 +66,12 @@ typedef enum tagTOFRGBD_GUEST_ID
 	TOFRGBD_GUEST_ID_17 = 0x17,//客户17
 	TOFRGBD_GUEST_ID_18 = 0x18,//客户18
 	TOFRGBD_GUEST_ID_19 = 0x19,//客户19
+	TOFRGBD_GUEST_ID_1A = 0x1A,//客户1A
+	TOFRGBD_GUEST_ID_1B = 0x1B,//客户1B
+	TOFRGBD_GUEST_ID_1C = 0x1C,//客户1C
+	TOFRGBD_GUEST_ID_1D = 0x1D,//客户1D
+	TOFRGBD_GUEST_ID_1E = 0x1E,//客户1E
+	TOFRGBD_GUEST_ID_1F = 0x1F,//客户1F
 
 	TOFRGBD_GUEST_ID_20 = 0x20,//客户20
 	TOFRGBD_GUEST_ID_21 = 0x21,//客户21
@@ -71,18 +83,18 @@ typedef enum tagTOFRGBD_GUEST_ID
 	TOFRGBD_GUEST_ID_27 = 0x27,//客户27
 	TOFRGBD_GUEST_ID_28 = 0x28,//客户28
 	TOFRGBD_GUEST_ID_29 = 0x29,//客户29
+	TOFRGBD_GUEST_ID_2A = 0x2A,//客户2A
+	TOFRGBD_GUEST_ID_2B = 0x2B,//客户2B
+	TOFRGBD_GUEST_ID_2C = 0x2C,//客户2C
+	TOFRGBD_GUEST_ID_2D = 0x2D,//客户2D
+	TOFRGBD_GUEST_ID_2E = 0x2E,//客户2E
+	TOFRGBD_GUEST_ID_2F = 0x2F,//客户2F
+
+	TOFRGBD_GUEST_ID_MAX,//
 
 
 }TOFRGBD_GUEST_ID;
 
-
-//灰度格式
-typedef enum tagTofRgbd_Gray_Format
-{
-	TofRgbd_Gray_Format_U8    = 0,//U8格式
-	TofRgbd_Gray_Format_U16   = 1,//U16格式
-	TofRgbd_Gray_Format_Float = 2,//float格式
-}TofRgbd_Gray_Format;
 
 //RGB或TOF模组内参和畸变 (通用模型)
 typedef struct tagTofRgbdLensGeneral
@@ -127,11 +139,21 @@ typedef struct tagTofRgbdLensParameter
 
 }TofRgbdLensParameter;
 
+//双目相机参数
+typedef struct tagTofRgbdStereoLensParameter
+{
+	float szRotationMatrix[3][3];//双目旋转矩阵
+	float szTranslationMatrix[3];//双目平移矩阵
+
+}TofRgbdStereoLensParameter;
+
 //RGBD参数类型
 typedef enum tagTOF_RGBD_PARAM_TYPE
 {
 	TOF_RGBD_PARAM_TofCameraLensParam = 0, //TOF模组的内参
 	TOF_RGBD_PARAM_RgbCameraLensParam, //RGB模组的内参
+	TOF_RGBD_PARAM_StereoLensParameter, //双目相机参数
+
 }TOF_RGBD_PARAM_TYPE;
 
 //RGBD参数
@@ -141,7 +163,8 @@ typedef struct tagTofRgbdParameter
 
 	union
 	{
-		TofRgbdLensParameter lensParam; //RGB或TOF模组的内参, 当 type=TOF_RGBD_PARAM_TofCameraLensParam 或 TOF_RGBD_PARAM_RgbCameraLensParam 时有效
+		TofRgbdLensParameter        lensParam; //RGB或TOF模组的内参【当type为TOF_RGBD_PARAM_TofCameraLensParam或TOF_RGBD_PARAM_RgbCameraLensParam时有效】
+		TofRgbdStereoLensParameter  stereoLensParam;//双目相机参数【当type为TOF_RGBD_PARAM_StereoLensParameter时有效】
 
 	}uParam;
 
@@ -256,8 +279,6 @@ typedef struct tagTofRgbdHandleParam
 	unsigned int nRgbWidth;//RGB分辨率宽
 	unsigned int nRgbHeight;//RGB分辨率高
 
-	TofRgbd_Gray_Format inGrayFormat;//输入的灰度格式
-
 }TofRgbdHandleParam;
 
 
@@ -266,11 +287,10 @@ typedef struct tagTofRgbdInputData
 {
 	TofRgbdPointCloud*  pPointCloud;//点云数据（以米为单位）
 
-	void*        pGray;//灰度数据（格式必须与初始化参数inGrayFormat指定的一致）
-	unsigned int nGrayLen;//pGray内灰度数据长度（字节数）
+	unsigned char* pGray;//灰度数据（U8格式）
 
-	unsigned char* pRgb;//BGR数据，只能是 bgr 排列顺序
-	unsigned int   nRgbLen;//pRgb内RGB数据长度（字节数）
+	unsigned char* pRgb;//BGR/RGB数据，可以是 bgr/rgb 排列顺序
+	unsigned int   nRgbLen;//pRgb内BGR/RGB数据长度（字节数）
 
 }TofRgbdInputData;
 
@@ -286,6 +306,7 @@ typedef struct tagTofRgbdOutputData
 	TofRgbdImage_PixelCoord rgb2TofPixelCoord; //RGB坐标与TOF坐标的映射表（可能为空）
 	
 	TofRgbdImage_Priv privData;//私有数据（用于客户定制）（一般为空）
+	TofRgbdImage_Float depth2rgb;
 
 }TofRgbdOutputData;
 

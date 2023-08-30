@@ -73,6 +73,9 @@ class RgbdNode : public rclcpp::Node
   void timer_ros_pub();
   void timer_hbmem_pub();
 
+  void depth_process(TTofRgbResult &oResTofPCL);
+  void color_process(TTofRgbResult &oResTofPCL);
+
   // ShyCam rgbdCam_;
   std::shared_ptr<std::thread> m_spThrdPub;
   std::atomic<bool> stop_;
@@ -123,6 +126,7 @@ class RgbdNode : public rclcpp::Node
   bool _enable_dep = true;
   bool _enable_rgb_pcl = true;
   bool _enable_pcl = true;
+  bool enable_fisheye_correction_ = true;
 
   int infra_w_ = 224;
   int infra_h_ = 108;

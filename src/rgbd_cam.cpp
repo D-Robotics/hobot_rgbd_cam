@@ -113,6 +113,10 @@ int ShyCam::CalcTofSync(TTofRgbResult *pOutTofRes)
     do {
         if (m_arrRecvStrmData[m_nCurUseIndex].enClrStat >= enDST_READY) {
             // 这里会变成 rgb 数据
+            m_arrRecvStrmData[m_nCurUseIndex].enClrStat = enDST_USING;
+            m_arrRecvStrmData[m_nCurUseIndex].enDepthStat = enDST_USING;
+			// printf("\nddepth %lld ms\n", m_arrRecvStrmData[m_nCurUseIndex].depth_frame.timeStamp/1000);
+            // printf("ccolor %lld ms\n\n", m_arrRecvStrmData[m_nCurUseIndex].clrTof_frame.timeStamp/1000);
             nRet = Calc_Depth2Tof(m_pTofCamHdl, &m_arrRecvStrmData[m_nCurUseIndex].depth_frame,
                 &m_arrRecvStrmData[m_nCurUseIndex].clrTof_frame, pOutTofRes);
             break;
@@ -295,6 +299,15 @@ int ShyCam::doCapStreamLoop()
     m_nPrintNum = 100;
     m_nPrintPairNum = m_nPairNum = 0;
     ROS_printf(2, "<========>[%s]->Start.\n", __func__);
+
+    auto GetTimestampDiff = [](unsigned long long u64TofTs, unsigned long long u64RgbTs) {
+        if (u64TofTs >= u64RgbTs) {
+            return u64TofTs - u64RgbTs;
+        } else {
+            return u64RgbTs - u64TofTs;
+        }
+    };
+
     while (!m_bThrdQuit) {
         if (m_bSyncOutput && enDEV_START == m_nDevStat) {
             int nNewPair = 1;  // 新组
@@ -305,6 +318,7 @@ int ShyCam::doCapStreamLoop()
                 usleep(10*1000);
                 continue;
             }
+
             do {
                 // 先取深度图，以 深度图为基准，取了深度图，就再取 yuv 图。
                 nNewPair = 0;
@@ -312,51 +326,23 @@ int ShyCam::doCapStreamLoop()
                 // ROS_printf(2, "=>startget:%d ,use(%d)st=d-%d:c-%d.\n", nCurSave, m_nCurUseIndex,
                 //  m_arrRecvStrmData[nCurSave].enDepthStat,
                 //  m_arrRecvStrmData[nCurSave].enClrStat);
-                if (m_arrRecvStrmData[nCurSave].enDepthStat == enDST_EMPTY) {
-                    // Depth
-                    if (0 == GetFrame_ShyCamera(m_pTofCamHdl, &m_arrRecvStrmData[nCurSave].depth_frame)) {
-                        m_nDepthNum++;
-                        m_arrRecvStrmData[nCurSave].enDepthStat = enDST_READY;
-                        if (++m_nPrintNum > 100) {
-                            m_nPrintNum = 0;
-                            msEnd = GetTickCount();
-                            ROS_printf(2, "--->[Depth: fps=%d, Save:use=%d:%d, st rgb:dep=%d:%d, W:H=%03d:%03d .\n",
-                                m_nDepthNum * 1000 / (msEnd - m_lStartTM),
-                                nCurSave, m_nCurUseIndex,
-                                m_nCurUseIndex == -1 ? -1 : m_arrRecvStrmData[m_nCurUseIndex].enClrStat,
-                                m_nCurUseIndex == -1 ? -1 : m_arrRecvStrmData[m_nCurUseIndex].enDepthStat,
-                                m_arrRecvStrmData[nCurSave].depth_frame.width,
-                                m_arrRecvStrmData[nCurSave].depth_frame.height);
-                        }
-                    } else {
-                        usleep(10*1000);
+
+                GetFrame_ShyCamera(m_pTofCamHdl, &m_arrRecvStrmData[nCurSave].depth_frame);
+                GetFrame_ShyCamera(m_pRgbCamHdl, &m_arrRecvStrmData[nCurSave].clrTof_frame);
+			// printf("\ndepth %lld ms\n", depth_frame.timeStamp/1000);
+            // printf("color %lld ms\n\n", clrTof_frame.timeStamp/1000);
+                while (GetTimestampDiff(m_arrRecvStrmData[nCurSave].depth_frame.timeStamp, m_arrRecvStrmData[nCurSave].clrTof_frame.timeStamp) > 10000) {
+                    if (m_arrRecvStrmData[nCurSave].depth_frame.timeStamp > m_arrRecvStrmData[nCurSave].clrTof_frame.timeStamp) {
+                        GetFrame_ShyCamera(m_pRgbCamHdl, &m_arrRecvStrmData[nCurSave].clrTof_frame);
                         continue;
-                    }
-                } else {
-                    // if (0 == GetVpsFrame_ShyCamera(m_pRgbCamHdl, &m_arrRecvStrmData[nCurSave].clrTof_frame, 0) &&
-                    //  0 == GetVpsFrame_ShyCamera(m_pRgbCamHdl, &m_arrRecvStrmData[nCurSave].clr_frame, 1)) {
-                    if (0 == GetFrame_ShyCamera(m_pRgbCamHdl, &m_arrRecvStrmData[nCurSave].clrTof_frame)) {
-                        m_arrRecvStrmData[nCurSave].enClrStat = enDST_READY;
                     } else {
-                        usleep(10*1000);
+                        GetFrame_ShyCamera(m_pTofCamHdl, &m_arrRecvStrmData[nCurSave].depth_frame);
                         continue;
                     }
                 }
-                if (m_arrRecvStrmData[nCurSave].enClrStat >= enDST_READY &&
-                    m_arrRecvStrmData[nCurSave].enDepthStat >= enDST_READY) {
-                    nNewPair = 1;
-                    ++m_nPairNum;
-                    if (++m_nPrintPairNum > 10) {
-                        msEnd = GetTickCount();
-                        m_nPrintPairNum = 0;
-                        ROS_printf(2, "--->[Pair]->fps=%d-%d, save:use=%d:%d, st rgb:dep=%d:%d.\n",
-                            m_nPairNum * 1000 / (msEnd - m_lStartTM), m_nPairNum, nCurSave, m_nCurUseIndex,
-                            m_nCurUseIndex == -1 ? -1 : m_arrRecvStrmData[m_nCurUseIndex].enClrStat,
-                            m_nCurUseIndex == -1 ? -1 : m_arrRecvStrmData[m_nCurUseIndex].enDepthStat);
-                    }
-                    // TLOG_INFO("End Recv Frame :%d ,use=%d, tmLaps=%d.\n", nCurSave, m_nCurUseIndex, msEnd - msStart);
-                    break;
-                }
+
+                m_arrRecvStrmData[nCurSave].enClrStat = enDST_READY;
+                m_arrRecvStrmData[nCurSave].enDepthStat = enDST_READY;
             } while (1);
         }
     }

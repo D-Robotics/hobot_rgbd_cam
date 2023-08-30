@@ -6,7 +6,7 @@
 #include "hb_vp_api.h"
 
 #include "camera_control.h"
-#include "camera_hb_cfg.h"
+#include "camera_cfg.h"
 
 
 #define BIT2CHN(chns, chn) (chns & (1 << chn))
@@ -288,7 +288,7 @@ static int hb_vin_vps_start(int pipeId, int iNeedIsp)
 
 	if (iNeedIsp)
 	{
-		ret = HB_VIN_EnableChn(pipeId, 0);  // dwe start
+		ret = HB_VIN_EnableChn(pipeId, 1);  // dwe start
 		if(ret < 0) {
 			printf("HB_VIN_EnableChn error!\n");
 			return ret;
@@ -472,6 +472,8 @@ static void normal_buf_info_print(hb_vio_buffer_t * buf)
 int hb_vps_init(int pipeId, uint32_t vin_vps_mode)
 {
 	int ret = 0;
+	int vpsFd = 0;
+	unsigned int u32VpsChn = 0;
 	VPS_GRP_ATTR_S grp_attr;
 	VPS_CHN_ATTR_S chn_attr;
 	VPS_PYM_CHN_ATTR_S pym_chn_attr;
@@ -479,41 +481,45 @@ int hb_vps_init(int pipeId, uint32_t vin_vps_mode)
 	memset(&grp_attr, 0, sizeof(VPS_GRP_ATTR_S));
 	grp_attr.maxW = RGB_WIDTH;
 	grp_attr.maxH = RGB_HEIGHT;
+	grp_attr.frameDepth = 3;
 	ret = HB_VPS_CreateGrp(pipeId, &grp_attr);
 	if (ret) {
 		printf("HB_VPS_CreateGrp error!!!\n");
 	} else {
 		printf("created a group ok:GrpId = %d\n", pipeId);
 	}
-	HB_SYS_SetVINVPSMode(pipeId, (SYS_VIN_VPS_MODE_E)vin_vps_mode);
+	//HB_SYS_SetVINVPSMode(pipeId, (SYS_VIN_VPS_MODE_E)vin_vps_mode);
 
 	memset(&chn_attr, 0, sizeof(VPS_CHN_ATTR_S));
 	chn_attr.enScale = 1;
-	chn_attr.width = RGB_WIDTH;
-	chn_attr.height = RGB_HEIGHT;
+	chn_attr.width = RGB_VPS_OUT_WIDTH;
+	chn_attr.height = RGB_VPS_OUT_HEIGHT;
 	chn_attr.frameDepth = 6;
 
-	if (BIT2CHN(need_ipu, 1)) {
-		ret = HB_VPS_SetChnAttr(pipeId, 1, &chn_attr);
-	if (ret) {
-		printf("HB_VPS_SetChnAttr error!!!\n");
-	} else {
-		printf("set chn Attr ok: GrpId = %d, chn_id = %d\n",
-				 pipeId, 1);
-	}
-		HB_VPS_EnableChn(pipeId, 1);
+	if (BIT2CHN(need_ipu, u32VpsChn)) {
+		ret = HB_VPS_SetChnAttr(pipeId, u32VpsChn, &chn_attr);
+		if (ret) {
+			printf("HB_VPS_SetChnAttr error!!!\n");
+		} else {
+			printf("set chn Attr ok: GrpId = %d, chn_id = %d\n",
+					 pipeId, u32VpsChn);
+		}
+		
+		HB_VPS_EnableChn(pipeId, u32VpsChn);
 	}
 
+#if 0
 	struct HB_SYS_MOD_S src_mod, dst_mod;
 	src_mod.enModId = HB_ID_VIN;
 	src_mod.s32DevId = pipeId;  // pipe0
-	src_mod.s32ChnId = 1;
+	src_mod.s32ChnId = 0;
 	dst_mod.enModId = HB_ID_VPS;
 	dst_mod.s32DevId = pipeId; // pipe1
-	dst_mod.s32ChnId = 0;
+	dst_mod.s32ChnId = u32VpsChn;
 	ret = HB_SYS_Bind(&src_mod, &dst_mod);
 	if (ret != 0)
 		printf("HB_SYS_Bind failed\n");
+#endif
 
 	return ret;
 }
@@ -596,22 +602,22 @@ static int VencChnAttrInit(VENC_CHN_ATTR_S *pVencChnAttr, PAYLOAD_TYPE_E p_enTyp
     }
     streambuf = (p_Width * p_Height)&0xfffff000;
 
-		pVencChnAttr->stVencAttr.u32PicWidth = p_Width;
-		pVencChnAttr->stVencAttr.u32PicHeight = p_Height;
+	pVencChnAttr->stVencAttr.u32PicWidth = p_Width;
+	pVencChnAttr->stVencAttr.u32PicHeight = p_Height;
 
-		pVencChnAttr->stVencAttr.enMirrorFlip = DIRECTION_NONE;
-		pVencChnAttr->stVencAttr.enRotation = CODEC_ROTATION_0;
-		pVencChnAttr->stVencAttr.stCropCfg.bEnable = HB_FALSE;
+	pVencChnAttr->stVencAttr.enMirrorFlip = DIRECTION_NONE;
+	pVencChnAttr->stVencAttr.enRotation = CODEC_ROTATION_0;
+	pVencChnAttr->stVencAttr.stCropCfg.bEnable = HB_FALSE;
 
-		pVencChnAttr->stVencAttr.enPixelFormat = pixFmt;
-		pVencChnAttr->stVencAttr.u32BitStreamBufferCount = 1;
-		pVencChnAttr->stVencAttr.u32FrameBufferCount = 2;
-		pVencChnAttr->stVencAttr.bExternalFreamBuffer = HB_TRUE;
-		pVencChnAttr->stVencAttr.stAttrMjpeg.restart_interval = 0;
-		pVencChnAttr->stVencAttr.u32BitStreamBufSize = streambuf;
+	pVencChnAttr->stVencAttr.enPixelFormat = pixFmt;
+	pVencChnAttr->stVencAttr.u32BitStreamBufferCount = 1;
+	pVencChnAttr->stVencAttr.u32FrameBufferCount = 2;
+	pVencChnAttr->stVencAttr.bExternalFreamBuffer = HB_TRUE;
+	pVencChnAttr->stVencAttr.stAttrMjpeg.restart_interval = 0;
+	pVencChnAttr->stVencAttr.u32BitStreamBufSize = streambuf;
 
-		pVencChnAttr->stGopAttr.u32GopPresetIdx = 6;
-		pVencChnAttr->stGopAttr.s32DecodingRefreshType = 2;
+	pVencChnAttr->stGopAttr.u32GopPresetIdx = 6;
+	pVencChnAttr->stGopAttr.s32DecodingRefreshType = 2;
 
     pVencChnAttr->stGopAttr.u32GopPresetIdx = 6;
     pVencChnAttr->stGopAttr.s32DecodingRefreshType = 2;
@@ -619,10 +625,20 @@ static int VencChnAttrInit(VENC_CHN_ATTR_S *pVencChnAttr, PAYLOAD_TYPE_E p_enTyp
     return 0;
 }
 
+int x3_venc_mjpgfixqp(VENC_RC_ATTR_S *pstRcParam,
+            VENC_MJPEG_FIXQP_S *pstMjpegFixQp)
+{
+    pstRcParam->stMjpegFixQp.u32FrameRate = pstMjpegFixQp->u32FrameRate;
+    pstRcParam->stMjpegFixQp.u32QualityFactort =
+                                        pstMjpegFixQp->u32QualityFactort;
+
+    return 0;
+}
 
 static int hb_venc_init(int VeChn, int type, int width, int height, int bitrate) 
 {
 	int ret;
+	unsigned int u32QualityFactort;
 	VENC_CHN_ATTR_S vencChnAttr;
 	VENC_RC_ATTR_S *pstRcParam;
 
@@ -636,7 +652,7 @@ static int hb_venc_init(int VeChn, int type, int width, int height, int bitrate)
 
 	pstRcParam = &(vencChnAttr.stRcAttr);
 
-	vencChnAttr.stRcAttr.enRcMode = VENC_RC_MODE_MJPEGCBR;
+	vencChnAttr.stRcAttr.enRcMode = VENC_RC_MODE_MJPEGFIXQP;
 	ret = HB_VENC_GetRcParam(VeChn, pstRcParam);
 	if (ret) {
 	      printf("HB_VENC_GetRcParam failed.\n");
@@ -647,6 +663,21 @@ static int hb_venc_init(int VeChn, int type, int width, int height, int bitrate)
 	pstRcParam->stMjpegCbr.u32MinQP = minQP;
 	pstRcParam->stMjpegCbr.u32MaxQP = maxQP;
 	pstRcParam->stMjpegCbr.u32BitRate = bitrate;
+
+	if ((width * height) >= 1920 * 1080)
+	{
+		u32QualityFactort = 80;
+	}
+	else
+	{
+		u32QualityFactort = 100;
+	}
+
+	VENC_MJPEG_FIXQP_S stMjpegFixQp;
+	memset(&stMjpegFixQp, 0,  sizeof(stMjpegFixQp));
+    stMjpegFixQp.u32FrameRate = 30;
+    stMjpegFixQp.u32QualityFactort = 80;	//u32QualityFactort;
+    x3_venc_mjpgfixqp(pstRcParam, &stMjpegFixQp);
 
 	ret = HB_VENC_SetRcParam(VeChn, &vencChnAttr.stRcAttr);
 	if (ret) {
@@ -733,6 +764,7 @@ int hb_video_init(HB_VIDEO_DEV_S *pstHbVideoDev)
 	uint64_t mmz_paddr;
 	char* mmz_vaddr;
 	int32_t mmz_size = RGB_WIDTH*RGB_HEIGHT*3/2;
+	int bitrate = 1000;
 	
 	HB_VIN_VPSS_INIT_S *pstHbVinVpssInit;
 	HB_SENSOR_INIT_S *pstHbSensorInit;
@@ -756,13 +788,6 @@ int hb_video_init(HB_VIDEO_DEV_S *pstHbVideoDev)
 
 	hb_enable_sensor_clk(pstHbVideoDev->mipiIdx);
 
-	iRet = hb_vin_vps_init(pstHbVinVpssInit, pstHbVideoDev->iNeedIsp);
-	if (iRet)
-	{
-		printf("[%s] hb_vin_vps_init failed\n", __func__);
-		return -1;
-	}
-
 	iRet = hb_sensor_init(pstHbSensorInit);
 	if (iRet)
 	{
@@ -775,6 +800,13 @@ int hb_video_init(HB_VIDEO_DEV_S *pstHbVideoDev)
 	{
 		printf("[%s] hb_mipi_init failed\n", __func__);
 		goto err_sensor_deinit;
+	}
+
+	iRet = hb_vin_vps_init(pstHbVinVpssInit, pstHbVideoDev->iNeedIsp);
+	if (iRet)
+	{
+		printf("[%s] hb_vin_vps_init failed\n", __func__);
+		return -1;
 	}
 
 	pstHbVideoDev->vin_fd = HB_VIN_GetChnFd(pstHbVideoDev->pipeId, 0);
@@ -806,7 +838,7 @@ int hb_video_init(HB_VIDEO_DEV_S *pstHbVideoDev)
 			goto err_mipi_deinit;
 		}
 
-		iRet = hb_venc_init(pstHbVideoDev->VeChn, PT_MJPEG, RGB_WIDTH, RGB_HEIGHT, 3000);
+		iRet = hb_venc_init(pstHbVideoDev->VeChn, PT_MJPEG, RGB_VPS_OUT_WIDTH, RGB_VPS_OUT_HEIGHT, bitrate);
 		if (iRet) {
 			printf("hb_venc_init failed\n");
 			goto err_venc_common_deinit;
@@ -908,8 +940,6 @@ int hb_video_start_stream(HB_VIDEO_DEV_S *pstHbVideoDev)
 		return -1;
 	}
 
-	hb_vin_vps_start(pstHbVideoDev->pipeId, pstHbVideoDev->iNeedIsp);
-
 	if (pstHbVideoDev->iNeedInitVps)
 	{
 		hb_vps_start(pstHbVideoDev->pipeId);	
@@ -919,6 +949,8 @@ int hb_video_start_stream(HB_VIDEO_DEV_S *pstHbVideoDev)
 	{
 		hb_venc_start(pstHbVideoDev->VeChn);		
 	}
+	
+	hb_vin_vps_start(pstHbVideoDev->pipeId, pstHbVideoDev->iNeedIsp);
 
 	hb_sensor_start(pstHbVideoDev->devId);
 	hb_mipi_start(pstHbVideoDev->mipiIdx);
@@ -959,6 +991,10 @@ int hb_video_stop_stream(HB_VIDEO_DEV_S *pstHbVideoDev)
 	return 0;
 }
 
+extern bool enable_frame_drop___;
+static uint64_t first_get_raw_data_time = 0;
+static uint64_t first_get_yuv_data_time = 0;
+static uint32_t time_diff_ms = 0;
 
 /**
  * @brief			hb_get_raw_data
@@ -997,6 +1033,16 @@ int hb_get_raw_data(HB_VIDEO_DEV_S *pstHbVideoDev, IMAGE_DATA_INFO_S *pstImageDa
 	else if (iRet)
 	{
 #endif
+		if (enable_frame_drop___)
+		{
+			HB_VIN_GetDevFrame(pstHbVideoDev->pipeId, 0, &sif_raw, 2000);
+			if (first_get_raw_data_time == 0) {
+				first_get_raw_data_time = sif_raw.img_info.tv.tv_sec*1000000 + sif_raw.img_info.tv.tv_usec;
+			}
+
+			HB_VIN_ReleaseDevFrame(pstHbVideoDev->pipeId, 0, &sif_raw);
+		}
+
 		iRet = HB_VIN_GetDevFrame(pstHbVideoDev->pipeId, 0, &sif_raw, 2000);
 		if (iRet < 0) 
 		{
@@ -1004,15 +1050,15 @@ int hb_get_raw_data(HB_VIDEO_DEV_S *pstHbVideoDev, IMAGE_DATA_INFO_S *pstImageDa
 			return -1;
 		}
 		else
-		{
-			//normal_buf_info_print(&sif_raw);
+		{		
+			pstImageDataInfo->uiImageSize= sif_raw.img_addr.stride_size * sif_raw.img_addr.height;
+			pstImageDataInfo->pucImageData= (unsigned char*)sif_raw.img_addr.addr[0];
+			pstImageDataInfo->timeStamp = sif_raw.img_info.tv.tv_sec*1000000 + sif_raw.img_info.tv.tv_usec;
+			pstImageDataInfo->uiFrameCnt = sif_raw.img_info.frame_id;
+
 			HB_VIN_ReleaseDevFrame(pstHbVideoDev->pipeId, 0, &sif_raw);
 		}
 
-		pstImageDataInfo->uiImageSize= sif_raw.img_addr.stride_size * sif_raw.img_addr.height;
-		pstImageDataInfo->pucImageData= (unsigned char*)sif_raw.img_addr.addr[0];
-		pstImageDataInfo->timeStamp = sif_raw.img_info.tv.tv_sec*1000000 + sif_raw.img_info.tv.tv_usec;
-		pstImageDataInfo->uiFrameCnt = sif_raw.img_info.frame_id;
 #if 0
 
 	}
@@ -1050,7 +1096,7 @@ int hb_get_yuv_data(HB_VIDEO_DEV_S *pstHbVideoDev, IMAGE_DATA_INFO_S *pstImageDa
 	select_timeout.tv_usec = 500 * 1000;
 	memset(&isp_yuv, 0, sizeof(isp_yuv));
 
-#if 1
+#if 0
 	iRet = select(pstHbVideoDev->vin_fd + 1, &readfd, NULL, NULL, &select_timeout);
 	if (iRet == -1) 
 	{
@@ -1059,35 +1105,83 @@ int hb_get_yuv_data(HB_VIDEO_DEV_S *pstHbVideoDev, IMAGE_DATA_INFO_S *pstImageDa
 	else if (iRet)
 	{
 #endif
+
 		iRet = HB_VIN_GetChnFrame(pstHbVideoDev->pipeId, 0, &isp_yuv, 2000);
 		if (iRet < 0) 
 		{
 			printf("HB_VIN_GetChnFrame error!!!\n");
+			return -1;
 		} 
-		else 
+
+		if (enable_frame_drop___)
 		{
-			iRet = HB_VIN_ReleaseChnFrame(pstHbVideoDev->pipeId, 0, &isp_yuv);
-			if (iRet < 0) 
+			if (first_get_yuv_data_time == 0)
 			{
-				printf("HB_VPS_ReleaseChnFrame error!!!\n");
+				first_get_yuv_data_time = isp_yuv.img_info.tv.tv_sec*1000000 + isp_yuv.img_info.tv.tv_usec;
+				auto time_diff = first_get_yuv_data_time - first_get_raw_data_time;
+				time_diff_ms = (time_diff / 1000 + 50) / 100;
+			}
+
+			if (time_diff_ms % 2 == 0)
+			{
+				HB_VIN_ReleaseChnFrame(pstHbVideoDev->pipeId, 0, &isp_yuv);
+				HB_VIN_GetChnFrame(pstHbVideoDev->pipeId, 0, &isp_yuv, 2000);
 			}
 		}
 
-		//normal_buf_info_print(&isp_yuv);
 
-		size_y = isp_yuv.img_addr.width * isp_yuv.img_addr.height;
-		size_uv = size_y / 2;
-		pstImageDataInfo->uiImageSize= size_y + size_uv;
+		if (pstHbVideoDev->iNeedInitVps) 
+		{
+			iRet = HB_VPS_SendFrame(pstHbVideoDev->pipeId, &isp_yuv, 1000);
+			if (iRet != 0) {
+				printf("HB_VPS_SendFrame Failed. vpsGrpId=%d ret=%d\n", pstHbVideoDev->pipeId, iRet);
+				return -1;
+			}
+			iRet = HB_VPS_GetChnFrame(pstHbVideoDev->pipeId, 0, &isp_yuv, 2000);
+			if (iRet < 0) {
+				printf("HB_VPS_GetChnFrame error!!!\n");
+				return -1;
+			} 
+		} 
 		
-		memset(pu8YuvBuffer, 0, sizeof(pu8YuvBuffer));
-		memcpy(pu8YuvBuffer, isp_yuv.img_addr.addr[0], size_y);
-		memcpy(pu8YuvBuffer+size_y, isp_yuv.img_addr.addr[1], size_uv);
-		pstImageDataInfo->pucImageData= pu8YuvBuffer;
-		
-		pstImageDataInfo->timeStamp = isp_yuv.img_info.tv.tv_sec*1000000 + isp_yuv.img_info.tv.tv_usec;
-		pstImageDataInfo->uiFrameCnt = isp_yuv.img_info.frame_id;
-		
-#if 1
+		if (iRet >= 0) 
+		{
+			//normal_buf_info_print(&isp_yuv);
+
+			size_y = isp_yuv.img_addr.width * isp_yuv.img_addr.height;
+			size_uv = size_y / 2;
+			pstImageDataInfo->uiImageSize= size_y + size_uv;
+			
+			memset(pu8YuvBuffer, 0, sizeof(pu8YuvBuffer));
+			memcpy(pu8YuvBuffer, isp_yuv.img_addr.addr[0], size_y);
+			memcpy(pu8YuvBuffer+size_y, isp_yuv.img_addr.addr[1], size_uv);
+			pstImageDataInfo->pucImageData= pu8YuvBuffer;
+			pstImageDataInfo->timeStamp = isp_yuv.img_info.tv.tv_sec*1000000 + isp_yuv.img_info.tv.tv_usec;
+			pstImageDataInfo->uiFrameCnt = isp_yuv.img_info.frame_id;
+
+			if (pstHbVideoDev->iNeedInitVps) 
+			{
+				iRet = HB_VPS_ReleaseChnFrame(pstHbVideoDev->pipeId, 0, &isp_yuv);
+				if (iRet) {
+					printf("HB_VPS_ReleaseChnFrame error!!!\n");
+				}
+			} 
+
+			iRet = HB_VIN_ReleaseChnFrame(pstHbVideoDev->pipeId, 0, &isp_yuv);
+			if (iRet < 0) {
+				printf("HB_VIN_ReleaseChnFrame error!!!\n");
+			}
+		}
+
+		if (enable_frame_drop___)
+		{
+			if (time_diff_ms % 2 != 0) {
+				HB_VIN_GetChnFrame(pstHbVideoDev->pipeId, 0, &isp_yuv, 2000);
+				HB_VIN_ReleaseChnFrame(pstHbVideoDev->pipeId, 0, &isp_yuv);
+			}
+		}
+
+#if 0
 	}
 	else
 	{
@@ -1113,11 +1207,11 @@ int hb_encode_send_frame(HB_VIDEO_DEV_S *pstHbVideoDev, IMAGE_DATA_INFO_S *pstIm
 	}
 
 	memset(&stFrame, 0x00, sizeof(VIDEO_FRAME_S));
-	stFrame.stVFrame.width = RGB_WIDTH;
-	stFrame.stVFrame.height = RGB_HEIGHT;
-	stFrame.stVFrame.size = RGB_WIDTH*RGB_HEIGHT*3/2;
+	stFrame.stVFrame.width = RGB_VPS_OUT_WIDTH;
+	stFrame.stVFrame.height = RGB_VPS_OUT_HEIGHT;
+	stFrame.stVFrame.size = RGB_VPS_OUT_WIDTH*RGB_VPS_OUT_HEIGHT*3/2;
 	stFrame.stVFrame.pix_format = HB_PIXEL_FORMAT_NV12;
-	offset = RGB_WIDTH * RGB_HEIGHT;
+	offset = RGB_VPS_OUT_WIDTH * RGB_VPS_OUT_HEIGHT;
 
 	if (1 == pstHbVideoDev->stMemBlock.isAvailable)
 	{

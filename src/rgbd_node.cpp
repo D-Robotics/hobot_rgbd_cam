@@ -17,9 +17,13 @@
 #include <sstream>
 // #include <std_srvs/srv/Empty.h>
 
+#include <opencv2/opencv.hpp>
+#include <future>
 #include <string>
 #include <memory>
 #include <stdarg.h>
+
+bool enable_frame_drop___ = true;
 
 extern "C" int ROS_printf(int nLev, char *fmt, ...)
 {
@@ -85,6 +89,8 @@ void RgbdNode::get_params()
   declare_parameter("enable_aligned_pointcloud", _enable_rgb_pcl);
   declare_parameter("enable_infra", _enable_infra);
   declare_parameter("camera_calibration_file_path", camera_calibration_file_path_);
+  declare_parameter("enable_fisheye_correction", enable_fisheye_correction_);
+  declare_parameter("enable_frame_drop", enable_frame_drop___);
 
   this->get_parameter("sensor_type", _sensor_type);
   this->get_parameter("io_method", _io_mode);
@@ -106,6 +112,8 @@ void RgbdNode::get_params()
   this->get_parameter_or("infra_height", infra_h_, 108);
   this->get_parameter_or("infra_fps", infra_fps_, 10);
   this->get_parameter_or("enable_infra", _enable_infra, true);
+  this->get_parameter_or("enable_fisheye_correction", enable_fisheye_correction_, true);
+  this->get_parameter_or("enable_frame_drop", enable_frame_drop___, true);
 
   RCLCPP_INFO(rclcpp::get_logger("rclcpp"), "color %d, enable_depth %d, enable_pointcloud %d, enable_aligned_pointcloud %d, enable_infra %d",
     _enable_clr, _enable_dep, _enable_pcl, _enable_rgb_pcl, _enable_infra);
@@ -184,7 +192,7 @@ void RgbdNode::exec_loopPub()
       imgClr_pub_ = this->create_publisher<sensor_msgs::msg::Image>(tsTopicName, BUF_PUB_NUM);
     }
   } else {
-#ifdef USING_HBMEM
+#ifdef USING_HBMEM_NOT
     // 创建hbmempub
     if (_enable_clr) {
       pub_hbmem1080P_ = this->create_publisher_hbmem<hbm_img_msgs::msg::HbmMsg1080P>(
@@ -301,83 +309,177 @@ void RgbdNode::pub_ori_pcl(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::Sha
     __func__, msg_pointcloud.width, msg_pointcloud.height, nIdx, nPtSz);
 }
 
+#define USINGCALI 1
+
+void RgbdNode::depth_process(TTofRgbResult &oResTofPCL) {
+  if (_enable_dep) {
+    // auto startTime = std::chrono::high_resolution_clock::now();
+    double timen = (double)oResTofPCL.mOriRes.timeStamp / 1e6;
+    img_dep_->header.stamp.sec = (int)timen;
+    img_dep_->header.stamp.nanosec = (timen - img_dep_->header.stamp.sec) * 1e9;
+    img_dep_->width = oResTofPCL.mOriDepth.nWidth;
+    img_dep_->height = oResTofPCL.mOriDepth.nHeight;
+    img_dep_->step = oResTofPCL.mOriDepth.nWidth * 2;
+    img_dep_->encoding = sensor_msgs::image_encodings::TYPE_16UC1;
+    img_dep_->data.resize(oResTofPCL.mOriDepth.nWidth *
+                          oResTofPCL.mOriDepth.nHeight * sizeof(uint16_t));
+    // printf("depth %d %d\n", img_dep_->header.stamp.sec, img_dep_->header.stamp.nanosec);
+    std::vector<uint16_t> depth_data;
+    if (enable_fisheye_correction_) {
+      // 使用构造函数创建cv::Mat
+      cv::Mat distortedImage(oResTofPCL.mOriDepth.nHeight, oResTofPCL.mOriDepth.nWidth, CV_32FC1, oResTofPCL.mOriDepth.pData);
+
+      // // 校正后的图像
+      cv::Mat undistortedImage;
+
+      static cv::Mat map1;
+      static cv::Mat map2;
+      static bool fisheye_remap_flag = false;
+      if (!fisheye_remap_flag) {
+        auto rgbFx = 1058.052734/4.0;
+        auto rgbFy = 1056.666504/4.0;
+        auto rgbCx = 958.157104/4.0;
+        auto rgbCy = 565.531128/4.0;
+        auto k1 = -0.046821;
+        auto k2 = -0.019841;
+        auto k3 = 0.010381;
+        auto k4 = -0.005047;
+
+        cv::Mat E = cv::Mat::eye(3, 3, cv::DataType<double>::type);
+        //rgb内参数矩阵，内参放缩系数与分辨率对应
+        cv::Mat M1 = cv::Mat::zeros(3, 3, CV_64FC1);
+        M1.at<double>(0, 0) = rgbFx;
+        M1.at<double>(1, 1) = rgbFy;
+        M1.at<double>(0, 2) = rgbCx;
+        M1.at<double>(1, 2) = rgbCy;
+        M1.at<double>(2, 2) = 1;
+        //rgb畸变系数
+        cv::Mat D1 = cv::Mat::zeros(4, 1, CV_64FC1);
+        D1.at<double>(0) = k1;
+        D1.at<double>(1) = k2;
+        D1.at<double>(2) = k3;
+        D1.at<double>(3) = k4;
+        cv::Mat M2 = M1.clone();
+        M2.at<double>(0, 0);
+        M2.at<double>(1, 1);
+
+        cv::Size size = {distortedImage.cols, distortedImage.rows};
+        cv::fisheye::initUndistortRectifyMap(M1, D1, E, M2, size, CV_16SC2, map1, map2);
+        fisheye_remap_flag=true;
+      }
+   
+      cv::remap(distortedImage, undistortedImage, map1, map2, cv::INTER_NEAREST, cv::BORDER_CONSTANT);
+
+      // 遍历图像的像素值
+      for (int row = 0; row < undistortedImage.rows; ++row) {
+          for (int col = 0; col < undistortedImage.cols; ++col) {
+              // 获取像素值
+              float pixelValue = undistortedImage.at<float>(row, col);
+              depth_data.push_back(
+                  static_cast<uint16_t>(std::round(pixelValue * 1000.0f)));
+          }
+      }
+    } else {
+      auto float_data = oResTofPCL.mOriDepth.pData;
+      for (int i = 0; i < oResTofPCL.mOriDepth.nWidth *
+                              oResTofPCL.mOriDepth.nHeight;
+            i++) {
+        depth_data.push_back(
+            static_cast<uint16_t>(std::round(*float_data * 1000.0f)));
+        float_data++;
+      }
+    }
+
+    memcpy(img_dep_->data.data(), depth_data.data(), img_dep_->data.size());
+    imgDep_pub_->publish(*img_dep_);
+    // auto endTime = std::chrono::high_resolution_clock::now();
+    // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    // std::cout << "imgDep_pub_ Code execution time: " << duration.count() << " milliseconds" << std::endl;
+  }
+}
+
+void RgbdNode::color_process(TTofRgbResult &oResTofPCL) {
+  if (_enable_clr) {
+    // auto startTime = std::chrono::high_resolution_clock::now();
+    img_clr_->encoding = sensor_msgs::image_encodings::BGR8;  // "bgr8";
+    double timen = (double)oResTofPCL.mOriRes.timeStamp / 1e6;
+    img_clr_->header.stamp.sec = (int)timen;
+    img_clr_->header.stamp.nanosec = (timen - img_clr_->header.stamp.sec) * 1e9;
+    img_clr_->width = 480;  // ImgYuv.width;
+    img_clr_->height = 270; // ImgYuv.height;
+    img_clr_->step = 480*3; // ImgYuv.width * 3;
+    img_clr_->data.resize(480 * 270 * 3);
+    // memcpy(&img_clr_->data[0], oResTofPCL.mOutRgb, img_clr_->data.size());
+    // printf("color %d %d\n", img_clr_->header.stamp.sec, img_clr_->header.stamp.nanosec);
+    cv::Mat K = (cv::Mat_<double>(3, 3) << 1058.052734/4.0, 0, 958.157104/4.0,
+                                          0, 1056.666504/4.0, 565.531128/4.0,
+                                          0, 0, 1);
+    cv::Mat D = (cv::Mat_<double>(1, 4) << -0.046821, -0.019841, 0.010381, -0.005047);
+    // cv::Mat distortedImage(1080, 1920, CV_8UC3, oResTofPCL.mOutRgb);
+    cv::Mat resizedImage;
+    cv::resize(oResTofPCL.mImageColor, resizedImage, cv::Size(480, 270), 0, 0, cv::INTER_NEAREST);
+
+    if (enable_fisheye_correction_) {
+      cv::Mat undistortedImage;
+      cv::fisheye::undistortImage(resizedImage, undistortedImage, K, D, K);
+      memcpy(&img_clr_->data[0], undistortedImage.data, img_clr_->data.size());
+    } else {
+      memcpy(&img_clr_->data[0], resizedImage.data, img_clr_->data.size());
+    }
+
+    imgClr_pub_->publish(*img_clr_);
+    // auto endTime = std::chrono::high_resolution_clock::now();
+    // auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime);
+    // std::cout << "imgClr_pub_ Code execution time: " << duration.count() << " milliseconds" << std::endl;
+  }
+}
+
 void RgbdNode::timer_ros_pub()
 {
   if (ShyCam::GetInstance()->is_capturing()) {
-    TShyFrame ImgDepth;
-    if (ShyCam::GetInstance()->GetDepthFrame(ImgDepth)) {
+    if (ShyCam::GetInstance()->GetValidUse() >= 0) {
       TTofRgbResult oResTofPCL = {0};
       // 改成取rgb 的数据
       if (0 == ShyCam::GetInstance()->CalcTofSync(&oResTofPCL)) {
         // 获取rgb 图，灰度图，点云，深度图
-        struct timespec time_start;
-        clock_gettime(CLOCK_MONOTONIC, &time_start);
-        int nDepthHeight = 129;
-        int nDepthSz = ImgDepth.width * nDepthHeight *2;
-        if (_enable_dep) {
-          img_dep_->header.stamp.sec = time_start.tv_sec;
-          img_dep_->header.stamp.nanosec = time_start.tv_nsec;
-          img_dep_->width = oResTofPCL.mOriRes.frameWidth;
-          img_dep_->height = oResTofPCL.mOriRes.frameHeight;
-          img_dep_->step = oResTofPCL.mOriRes.frameWidth;
-          img_dep_->encoding = sensor_msgs::image_encodings::TYPE_16UC1;
-          img_dep_->data.resize(oResTofPCL.mOriRes.frameWidth *
-                                oResTofPCL.mOriRes.frameHeight * 2);
-          std::vector<uint16_t> depth_data;
-          auto float_data = oResTofPCL.mPclRgb.pData;
-          for (int i = 0; i < oResTofPCL.mOriRes.frameWidth *
-                                  oResTofPCL.mOriRes.frameHeight;
-               i++) {
-            depth_data.push_back(
-                static_cast<uint16_t>(std::round(float_data->z * 1000.0f)));
-            float_data++;
-          }
-          memcpy(&img_dep_->data[0], depth_data.data(),
-                 oResTofPCL.mOriRes.frameWidth *
-                     oResTofPCL.mOriRes.frameHeight * 2);
-          imgDep_pub_->publish(*img_dep_);
-        }
-        if (_enable_infra) {
-          img_infra_->header.stamp = img_dep_->header.stamp;
-          img_infra_->width = oResTofPCL.mOriRes.frameWidth;  // ImgDepth.width;
-          img_infra_->height = oResTofPCL.mOriRes.frameHeight;
-          img_infra_->step = oResTofPCL.mOriRes.frameWidth;
-          img_infra_->encoding = sensor_msgs::image_encodings::TYPE_8UC1;
-          img_infra_->data.resize(oResTofPCL.mOriRes.frameWidth * oResTofPCL.mOriRes.frameHeight);
-          memcpy(&img_infra_->data[0], oResTofPCL.mOriRes.pU8Graydata, img_infra_->data.size());
-          imgInfra_pub_->publish(*img_infra_);
-        }
+        std::future<void> depth_pro = std::async(std::launch::async, std::bind(&RgbdNode::depth_process, this, oResTofPCL));
+        std::future<void> color_pro = std::async(std::launch::async, std::bind(&RgbdNode::color_process, this, oResTofPCL));
 
-        if (_enable_clr) {
-          TShyFrame ImgYuv;
-          ShyCam::GetInstance()->GetClrFrame(ImgYuv, 0);
-          img_clr_->encoding = sensor_msgs::image_encodings::BGR8;  // "bgr8";
-          img_clr_->header.stamp = img_dep_->header.stamp;
-          img_clr_->width = ImgYuv.width;
-          img_clr_->height = ImgYuv.height;
-          img_clr_->step = ImgYuv.width;
-          img_clr_->data.resize(ImgYuv.size * 2);
-          memcpy(&img_clr_->data[0], oResTofPCL.mOutRgb, img_clr_->data.size());
-          imgClr_pub_->publish(*img_clr_);
-        }
-        if (_enabled_read_cam_calibration) {
-          camera_calibration_info_->header.stamp = img_dep_->header.stamp;
-          imgCam_pub_->publish(*camera_calibration_info_);
-          RCLCPP_INFO(rclcpp::get_logger("rgbd_node"),"publish camera info.\n");
-        }
+        // struct timespec time_start;
+        // double timen = (double)oResTofPCL.mOriRes.timeStamp / 1e6;
+        // time_start.tv_sec = (int)timen;
+        // time_start.tv_nsec = (timen - time_start.tv_sec) * 1e9;
+        
+        // if (_enable_infra) {
+        //   img_infra_->header.stamp = img_dep_->header.stamp;
+        //   img_infra_->width = oResTofPCL.mOriRes.frameWidth;  // ImgDepth.width;
+        //   img_infra_->height = oResTofPCL.mOriRes.frameHeight;
+        //   img_infra_->step = oResTofPCL.mOriRes.frameWidth;
+        //   img_infra_->encoding = sensor_msgs::image_encodings::TYPE_8UC1;
+        //   img_infra_->data.resize(oResTofPCL.mOriRes.frameWidth * oResTofPCL.mOriRes.frameHeight);
+        //   memcpy(&img_infra_->data[0], oResTofPCL.mOriRes.pU8Graydata, img_infra_->data.size());
+        //   imgInfra_pub_->publish(*img_infra_);
+        // }
+
+        // if (_enabled_read_cam_calibration) {
+        //   camera_calibration_info_->header.stamp = img_dep_->header.stamp;
+        //   imgCam_pub_->publish(*camera_calibration_info_);
+        //   RCLCPP_INFO(rclcpp::get_logger("rgbd_node"),"publish camera info.\n");
+        // }
         // pub_CamInfo(depCam_pub_,);
-        if (_enable_pcl)
-          pub_ori_pcl(img_pcl_pub_, oResTofPCL.mOriRes, time_start);
-        if (_enable_rgb_pcl)
-          pub_align_pcl(img_pcl_align_pub_, oResTofPCL.mPclRgb, time_start);
-        // pub_pcl(img_pcl_align_pub_);
+        // if (_enable_pcl)
+        //   pub_ori_pcl(img_pcl_pub_, oResTofPCL.mOriRes, time_start);
+        // if (_enable_rgb_pcl)
+        //   pub_align_pcl(img_pcl_align_pub_, oResTofPCL.mPclRgb, time_start);
+        // // pub_pcl(img_pcl_align_pub_);
+
+        depth_pro.wait();
+        color_pro.wait();
 
         // m_oTofPcl->CalcShyTofSync(oResTofPCL, m_oResTofPCL.pnt_cloud, m_oResTofPCL.ori_pnt_cloud);
         // 直接获取 rgb，pt，等各个数据，然后 pub
-        RCLCPP_INFO(rclcpp::get_logger("rgbd_node"), "[%s]->pub dep w:h=%d:%d,sz=%d, infra w:h=%d:%d, sz=%d.",
-          __func__, img_dep_->width, img_dep_->height, ImgDepth.size,
-          img_infra_->width, img_infra_->height, img_infra_->data.size());
-        ReleaseTofResult(&oResTofPCL);
+        RCLCPP_INFO(rclcpp::get_logger("rgbd_node"), "[%s]->pub dep w:h=%d:%d, infra w:h=%d:%d.",
+          __func__, img_dep_->width, img_dep_->height, img_infra_->width, img_infra_->height);
       }
       ShyCam::GetInstance()->ReleaseDepthFrame();
       ShyCam::GetInstance()->ReleaseClrFrame();
@@ -387,7 +489,7 @@ void RgbdNode::timer_ros_pub()
 }
 void RgbdNode::timer_hbmem_pub()
 {
-#ifdef USING_HBMEM
+#ifdef USING_HBMEM_NOT
   if (ShyCam::GetInstance()->is_capturing()) {
     TShyFrame ImgDepth;
     if (ShyCam::GetInstance()->GetDepthFrame(ImgDepth)) {
@@ -397,10 +499,9 @@ void RgbdNode::timer_hbmem_pub()
         // 获取rgb 图，灰度图，点云，深度图
         ++mSendIdx;
         struct timespec time_start;
-        clock_gettime(CLOCK_MONOTONIC, &time_start);
-
-        int nDepthHeight = 129;
-        int nDepthSz = ImgDepth.width * nDepthHeight *2;
+        double timen = (double)oResTofPCL.mOriRes.timeStamp / 1e6;
+        time_start.tv_sec = (int)timen;
+        time_start.tv_nsec = (timen - time_start.tv_sec) * 1e9;
         if (_enable_dep) {
           auto loanedepthMsg = pub_hbmemdepth_->borrow_loaned_message();
           if (loanedepthMsg.is_valid()) {
@@ -410,11 +511,21 @@ void RgbdNode::timer_hbmem_pub()
               strlen(sensor_msgs::image_encodings::TYPE_16UC1));
             msg.time_stamp.sec = time_start.tv_sec;
             msg.time_stamp.nanosec = time_start.tv_nsec;
-            msg.width = ImgDepth.width;
-            msg.height = nDepthHeight;
-            msg.step = ImgDepth.width;
-            msg.data_size = nDepthSz;
-            memcpy(msg.data.data(), ImgDepth.pucImageData + nDepthSz *9, nDepthSz);
+            msg.width = oResTofPCL.mOriRes.frameWidth;
+            msg.height = oResTofPCL.mOriRes.frameHeight;
+            msg.step = oResTofPCL.mOriRes.frameWidth * 2;
+            msg.data_size = oResTofPCL.mOriRes.frameWidth *
+                                oResTofPCL.mOriRes.frameHeight * 2;
+            std::vector<uint16_t> depth_data;
+            auto float_data = oResTofPCL.mPclRgb.pData;
+            for (int i = 0; i < oResTofPCL.mOriRes.frameWidth *
+                                    oResTofPCL.mOriRes.frameHeight;
+                i++) {
+              depth_data.push_back(
+                  static_cast<uint16_t>(std::round(float_data->z * 1000.0f)));
+              float_data++;
+            }
+            memcpy(msg.data.data(), depth_data.data(), msg.data_size);
             pub_hbmemdepth_->publish(std::move(loanedepthMsg));
           } else {
             RCLCPP_ERROR(rclcpp::get_logger("rgbd_node"), "depth borrow_loaned_message failed");
@@ -454,7 +565,7 @@ void RgbdNode::timer_hbmem_pub()
             msg.time_stamp.nanosec = time_start.tv_nsec;
             msg.width = ImgYuv.width;
             msg.height = ImgYuv.height;
-            msg.step = ImgYuv.width;
+            msg.step = ImgYuv.width *3;
             msg.data_size = ImgYuv.size * 2;
             memcpy(msg.data.data(), oResTofPCL.mOutRgb, msg.data_size);
             pub_hbmem1080P_->publish(std::move(loaned1080Msg));
@@ -477,7 +588,6 @@ void RgbdNode::timer_hbmem_pub()
         RCLCPP_INFO(rclcpp::get_logger("rgbd_node"), "[%s]->pub dep w:h=%d:%d,sz=%d, infra w:h=%d:%d, sz=%d.",
           __func__, img_dep_->width, img_dep_->height, ImgDepth.size,
           img_infra_->width, img_infra_->height, img_infra_->data.size());
-        ReleaseTofResult(&oResTofPCL);
       }
       ShyCam::GetInstance()->ReleaseDepthFrame();
       ShyCam::GetInstance()->ReleaseClrFrame();

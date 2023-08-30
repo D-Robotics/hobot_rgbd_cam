@@ -5,8 +5,6 @@
 #include <string>
 
 #include "tof_mod_sdk.h"
-#include "tof_error.h"
-#include "typedef.h"
 #include "camera_control.h"
 
 
@@ -14,7 +12,7 @@
 #define CALIB_DATA_MAGIC 		0x594E5553
 
 #define RINS_FILE_SIZE 			(1024)
-#define RGBD_CALIB_SIZE			(1024)
+#define RGBD_CALIB_SIZE			(512)
 #define	MAX_READ_PAGE	 		(8*1024)
 #define	MAX_READ_SZIE	 		(16*8*1024+RINS_FILE_SIZE)
 
@@ -43,17 +41,16 @@ typedef struct tagcalib_frame_header_v20_t
 
 typedef struct tof_depth_data_info
 {
-	UINT64  timeStamp;//时间戳
-	UINT32  uiFrameCnt;//帧计数
-	UINT32  frameWidth;//深度图宽度
-	UINT32  frameHeight;//深度图高度
-	PointData *pfPointData;//点云数据
-	GRAY_FORMAT grayFormat;//pGrayData内数据格式
-	void   *pGrayData;//灰度数据
-	UINT16   *pu16GrayData;//u16灰度数据
-	UINT16	*pu16Confidence;//置信度
-	float	*pfNoise;//噪声
-	FLOAT32* pDepthData;//射线距离
+	UINT64  timeStamp;				//时间戳
+	UINT32  uiFrameCnt;				//帧计数
+	UINT32  frameWidth;				//深度图宽度
+	UINT32  frameHeight;			//深度图高度
+	PointData *pfPointData;			//点云数据
+	PointData *pPointDataUnfilter;	//点云数据(滤波前)
+	unsigned char *pu8GrayData;		//灰度数据
+	UINT16	*pu16Confidence;		//置信度
+	float	*pfNoise;				//噪声
+	FLOAT32* pDepthData;			//射线距离
 } TOF_DEPTH_DATA_INFO_S;
 
 
@@ -62,12 +59,9 @@ void TofDepthSdkGloableUnInit();
 int TofDepthSdkInit(DEPTH_HANDLE_CB_S *pstDepthHandleCb, char *pcCalibDataPath, void *pHalUserData);
 int TofDepthSdkUnInit(DEPTH_HANDLE_CB_S *pstDepthHandleCb);
 int TofDepthProcess(HTOFM hTofMod, IMAGE_DATA_INFO_S *pstTofRawDataInfo, TOF_DEPTH_DATA_INFO_S *pstTofDepthDataInfo);
-int TofDepthProcessExp(void *pCamHandle, IMAGE_DATA_INFO_S *pstTofRawDataInfo, TOF_DEPTH_DATA_INFO_S *pstTofDepthDataInfo, int iDepthHandleIndex);
-int CaculateGrayPixelBytes(const GRAY_FORMAT format);
 void HandleDepthData(const UINT32 threadIndex, UINT32 frameIndex, std::string& strSaveDir, std::string strTofName, TOF_DEPTH_DATA_INFO_S* tofFrameData);
+float CalCenterPointDataZAvg(PointData *pPointData, const UINT32 width, const UINT32 height);
 void *Sunny_SetTofEXP(void *para);
-
-bool TofGray2U8(void* pGrayData, const UINT32 width, const UINT32 height, const GRAY_FORMAT format, void ** pOutGrayU8);
 
 #ifdef RGBD
 int TofRgbdSdkInit(HTOFRGBD *ppstRgbdHandle, const char *pcRgbdCalibPath);

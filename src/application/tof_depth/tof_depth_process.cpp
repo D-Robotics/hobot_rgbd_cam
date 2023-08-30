@@ -30,13 +30,12 @@
 #include <mutex>
 #include <vector>
 #include <chrono>
-#include "tof_error.h"
 #include "tof_mod_sdk.h"
 
 #include "tof_depth_process.h"
 #include "tof_i2c.h"
 #include "camera_control.h"
-#include "camera_hb_cfg.h"
+#include "camera_cfg.h"
 
 //
 #define SAFE_DELETE(p) if(p){delete p; p=NULL;}
@@ -173,39 +172,7 @@ T Utils_FindMinValue(T* pData, const int nCnt)
 	return min;
 }
 
-int CaculateGrayPixelBytes(const GRAY_FORMAT format)
-{
-	int grayByte = 1;
-
-	switch (format)
-	{
-	case GRAY_FORMAT_UINT8: grayByte = 1; break;
-	case GRAY_FORMAT_UINT16: grayByte = 2; break;
-	case GRAY_FORMAT_FLOAT: grayByte = 4; break;
-	case GRAY_FORMAT_BGRD: grayByte = 4; break;
-	default:break;
-	}
-
-	return grayByte;
-
-}
-static const char* StringGrayFormat(const GRAY_FORMAT format)
-{
-	const char* pStr = "UnknownGRAY";
-
-	switch (format)
-	{
-	case GRAY_FORMAT_UINT8: pStr = "U8"; break;
-	case GRAY_FORMAT_UINT16: pStr = "U16"; break;
-	case GRAY_FORMAT_FLOAT: pStr = "FLOAT"; break;
-	case GRAY_FORMAT_BGRD: pStr = "BGRD"; break;
-
-	default: break;
-	}
-
-	return pStr;
-}
-static float CalCenterPointDataZAvg(PointData *pPointData, const UINT32 width, const UINT32 height)
+float CalCenterPointDataZAvg(PointData *pPointData, const UINT32 width, const UINT32 height)
 {
 	if (NULL == pPointData)
 	{
@@ -277,364 +244,6 @@ static const char* TofMode2Str(const TOF_MODE mode)
 	}
 
 	return pStr;
-}
-
-
-class CGrayConvert
-{
-	CGrayConvert();
-	~CGrayConvert();
-
-public:
-	static bool Gray_2_Bgr32(void* pGray, const int width, const int height, const GRAY_FORMAT format, unsigned int* pBgr32);
-	static bool Gray_2_U16(void* pGray, const int width, const int height, const GRAY_FORMAT format, unsigned short* pU16);
-	static bool Gray_2_U8(void* pGray, const int width, const int height, const GRAY_FORMAT format, unsigned char* pU8);
-
-private:
-	static bool ToBgr32(unsigned char* pGray, const int width, const int height, unsigned int* pBgr32);
-	static bool ToBgr32(unsigned short* pGray, const int width, const int height, unsigned int* pBgr32);
-	static bool ToBgr32(float* pGray, const int width, const int height, unsigned int* pBgr32);
-	static bool ToBgr32(unsigned int* pGray, const int width, const int height, unsigned int* pBgr32);
-private:
-	static bool ToU16(unsigned char* pGray, const int width, const int height, unsigned short* pU16);
-	static bool ToU16(unsigned short* pGray, const int width, const int height, unsigned short* pU16);
-	static bool ToU16(float* pGray, const int width, const int height, unsigned short* pU16);
-	static bool ToU16(unsigned int* pGray, const int width, const int height, unsigned short* pU16);
-private:
-	static bool ToU8(unsigned char* pGray, const int width, const int height, unsigned char* pU8);
-	static bool ToU8(unsigned short* pGray, const int width, const int height, unsigned char* pU8);
-	static bool ToU8(float* pGray, const int width, const int height, unsigned char* pU8);
-	static bool ToU8(unsigned int* pGray, const int width, const int height, unsigned char* pU8);
-};
-CGrayConvert::CGrayConvert()
-{
-}
-CGrayConvert::~CGrayConvert()
-{
-}
-
-bool CGrayConvert::Gray_2_Bgr32(void* pGray, const int width, const int height, const GRAY_FORMAT format, unsigned int* pBgr32)
-{
-	bool retVal = false;
-
-	switch (format)
-	{
-	case GRAY_FORMAT_UINT8:  retVal = ToBgr32((unsigned char*)pGray, width, height, pBgr32); break;
-	case GRAY_FORMAT_UINT16: retVal = ToBgr32((unsigned short*)pGray, width, height, pBgr32); break;
-	case GRAY_FORMAT_FLOAT:  retVal = ToBgr32((float*)pGray, width, height, pBgr32); break;
-	case GRAY_FORMAT_BGRD:   retVal = ToBgr32((unsigned int*)pGray, width, height, pBgr32); break;
-	default: break;
-	}
-
-	return retVal;
-}
-
-bool CGrayConvert::Gray_2_U16(void* pGray, const int width, const int height, const GRAY_FORMAT format, unsigned short* pU16)
-{
-	bool retVal = false;
-
-	switch (format)
-	{
-	case GRAY_FORMAT_UINT8:  retVal = ToU16((unsigned char*)pGray, width, height, pU16); break;
-	case GRAY_FORMAT_UINT16: retVal = ToU16((unsigned short*)pGray, width, height, pU16); break;
-	case GRAY_FORMAT_FLOAT:  retVal = ToU16((float*)pGray, width, height, pU16); break;
-	case GRAY_FORMAT_BGRD:   retVal = ToU16((unsigned int*)pGray, width, height, pU16); break;
-	default: break;
-	}
-
-	return retVal;
-}
-
-bool CGrayConvert::Gray_2_U8(void* pGray, const int width, const int height, const GRAY_FORMAT format, unsigned char* pU8)
-{
-	bool retVal = false;
-
-	switch (format)
-	{
-	case GRAY_FORMAT_UINT8:  retVal = ToU8((unsigned char*)pGray, width, height, pU8); break;
-	case GRAY_FORMAT_UINT16: retVal = ToU8((unsigned short*)pGray, width, height, pU8); break;
-	case GRAY_FORMAT_FLOAT:  retVal = ToU8((float*)pGray, width, height, pU8); break;
-	case GRAY_FORMAT_BGRD:   retVal = ToU8((unsigned int*)pGray, width, height, pU8); break;
-	default: break;
-	}
-
-	return retVal;
-}
-bool CGrayConvert::ToBgr32(unsigned char* pGray, const int width, const int height, unsigned int* pBgr32)
-{
-	const int pixel_cnt = width*height;
-
-	for (int i = 0; i < pixel_cnt; i++)
-	{
-		pBgr32[i] = ((pGray[i] << 24) | (pGray[i] << 16) | (pGray[i] << 8) | pGray[i]);
-	}
-
-	return true;
-}
-bool CGrayConvert::ToBgr32(unsigned short* pGray, const int width, const int height, unsigned int* pBgr32)
-{
-	const int pixel_cnt = width*height;
-	//const unsigned short min = Utils_FindMinValue(pGray, pixel_cnt);//*min_element(pGray, pGray + pixel_cnt);//min_element耗时长
-	const unsigned short max = Utils_FindMaxValue(pGray, pixel_cnt);// *max_element(pGray, pGray + pixel_cnt);//max_element耗时长
-
-	if (0 >= max)
-	{
-		memset(pBgr32, 0, pixel_cnt * sizeof(pBgr32[0]));
-		return true;
-	}
-
-	const float K = (255 * 1.0 / max);//最大值是255的多少倍
-
-	for (int i = 0; i < pixel_cnt; i++)
-	{
-		const unsigned char tmp = (unsigned char)(pGray[i] * K);
-		pBgr32[i] = ((tmp << 24) | (tmp << 16) | (tmp << 8) | tmp);
-	}
-
-	return true;
-}
-bool CGrayConvert::ToBgr32(float* pGray, const int width, const int height, unsigned int* pBgr32)
-{
-	const int pixel_cnt = width*height;
-	//const float min = Utils_FindMinValue(pGray, pixel_cnt);//*min_element(pGray, pGray + pixel_cnt);//min_element耗时长
-	const float max = Utils_FindMaxValue(pGray, pixel_cnt);// *max_element(pGray, pGray + pixel_cnt);//max_element耗时长
-
-	if (0.001 >= max)//0值用黑色表示
-	{
-		memset(pBgr32, 0, pixel_cnt * sizeof(pBgr32[0]));
-		return true;
-	}
-
-	const float K = (255 * 1.0 / max);//最大值是255的多少倍
-
-	for (int i = 0; i < pixel_cnt; i++)
-	{
-		unsigned char tmp = 0;//0值用黑色表示
-		if (0.001 < pGray[i])
-		{
-			tmp = (unsigned char)(pGray[i] * K);
-		}
-		pBgr32[i] = ((tmp << 24) | (tmp << 16) | (tmp << 8) | tmp);
-	}
-
-	return true;
-}
-bool CGrayConvert::ToBgr32(unsigned int* pGray, const int width, const int height, unsigned int* pBgr32)
-{
-	const int pixel_cnt = width*height;
-
-	memcpy(pBgr32, pGray, pixel_cnt * sizeof(pBgr32[0]));
-
-	return true;
-}
-
-bool CGrayConvert::ToU16(unsigned char* pGray, const int width, const int height, unsigned short* pU16)
-{
-	const int pixel_cnt = width*height;
-	//const unsigned char min = Utils_FindMinValue(pGray, pixel_cnt);//*min_element(pGray, pGray + pixel_cnt);//min_element耗时长
-	const unsigned char max = Utils_FindMaxValue(pGray, pixel_cnt);// *max_element(pGray, pGray + pixel_cnt);//max_element耗时长
-
-	if (0 >= max)
-	{
-		memset(pU16, 0, pixel_cnt * sizeof(pU16[0]));
-		return true;
-	}
-
-	const float K = (65535 * 1.0 / max);//最大值是65535的多少倍
-
-	for (int i = 0; i < pixel_cnt; i++)
-	{
-		const unsigned short tmp = (unsigned short)(pGray[i] * K);
-		pU16[i] = tmp;
-	}
-
-	return true;
-}
-bool CGrayConvert::ToU16(unsigned short* pGray, const int width, const int height, unsigned short* pU16)
-{
-	const int pixel_cnt = width*height;
-
-	memcpy(pU16, pGray, pixel_cnt * sizeof(pU16[0]));
-
-	return true;
-}
-bool CGrayConvert::ToU16(float* pGray, const int width, const int height, unsigned short* pU16)
-{
-#if 1
-	//方法1：灰度直接数据类型强转
-
-	const int pixel_cnt = width*height;
-
-	for (int i = 0; i < pixel_cnt; i++)
-	{
-		pU16[i] = ((65535.0 < pGray[i]) ? 65535 : pGray[i]);
-	}
-
-#else
-	//方法2：灰度按照等比例压缩
-
-	const int pixel_cnt = width*height;
-	//const float min = Utils_FindMinValue(pGray, pixel_cnt);//*min_element(pGray, pGray + pixel_cnt);//min_element耗时长
-	const float max = Utils_FindMaxValue(pGray, pixel_cnt);// *max_element(pGray, pGray + pixel_cnt);//max_element耗时长
-
-	if (0.001 >= max)//0值用黑色表示
-	{
-		memset(pU16, 0, pixel_cnt * sizeof(pU16[0]));
-		return true;
-	}
-
-	const float K = (65535 * 1.0 / max);//最大值是65535的多少倍
-
-	for (int i = 0; i < pixel_cnt; i++)
-	{
-		unsigned short tmp = 0;//0值用黑色表示
-		if (0.001 < pGray[i])
-		{
-			tmp = (unsigned short)(pGray[i] * K);
-		}
-		pU16[i] = tmp;
-	}
-#endif
-	return true;
-}
-bool CGrayConvert::ToU16(unsigned int* pGray, const int width, const int height, unsigned short* pU16)
-{
-	const int pixel_cnt = width*height;
-
-	for (int i = 0; i < pixel_cnt; i++)
-	{
-		unsigned char* pTmp = (unsigned char*)(pGray + i);//BGRD排列
-		pU16[i] = (pTmp[0] << 8);//放大到65535
-	}
-
-	return true;
-}
-
-bool CGrayConvert::ToU8(unsigned char* pGray, const int width, const int height, unsigned char* pU8)
-{
-	const int pixel_cnt = width*height;
-
-	memcpy(pU8, pGray, pixel_cnt * sizeof(pU8[0]));
-
-	return true;
-}
-bool CGrayConvert::ToU8(unsigned short* pGray, const int width, const int height, unsigned char* pU8)
-{
-	const int pixel_cnt = width*height;
-	//const unsigned short min = Utils_FindMinValue(pGray, pixel_cnt);//*min_element(pGray, pGray + pixel_cnt);//min_element耗时长
-	const unsigned short max = Utils_FindMaxValue(pGray, pixel_cnt);// *max_element(pGray, pGray + pixel_cnt);//max_element耗时长
-
-	if (0 >= max)
-	{
-		memset(pU8, 0, pixel_cnt * sizeof(pU8[0]));
-		return true;
-	}
-
-	const float K = (255 * 1.0 / max);//最大值是255的多少倍
-
-	for (int i = 0; i < pixel_cnt; i++)
-	{
-		const unsigned char tmp = (unsigned char)(pGray[i] * K);
-		pU8[i] = tmp;
-	}
-
-	return true;
-}
-bool CGrayConvert::ToU8(float* pGray, const int width, const int height, unsigned char* pU8)
-{
-	const int pixel_cnt = width*height;
-	//const float min = Utils_FindMinValue(pGray, pixel_cnt);//*min_element(pGray, pGray + pixel_cnt);//min_element耗时长
-	const float max = Utils_FindMaxValue(pGray, pixel_cnt);// *max_element(pGray, pGray + pixel_cnt);//max_element耗时长
-
-	if (0.001 >= max)//0值用黑色表示
-	{
-		memset(pU8, 0, pixel_cnt * sizeof(pU8[0]));
-		return true;
-	}
-
-	const float K = (255 * 1.0 / max);//最大值是255的多少倍
-
-	for (int i = 0; i < pixel_cnt; i++)
-	{
-		unsigned char tmp = 0;//0值用黑色表示
-		if (0.001 < pGray[i])
-		{
-			tmp = (unsigned char)(pGray[i] * K);
-		}
-		pU8[i] = tmp;
-	}
-
-	return true;
-}
-bool CGrayConvert::ToU8(unsigned int* pGray, const int width, const int height, unsigned char* pU8)
-{
-	const int pixel_cnt = width*height;
-
-	for (int i = 0; i < pixel_cnt; i++)
-	{
-		unsigned char* pTmp = (unsigned char*)(pGray + i);//BGRD排列
-		pU8[i] = pTmp[0];
-	}
-
-	return true;
-}
-
-static bool SaveGray_2_BGR32(void* pGray, const UINT32 width, const UINT32 height, const GRAY_FORMAT format, char* pFile)
-{
-	if ((NULL == pGray) || (0 >= width) || (0 >= height) || (NULL == pFile))
-	{
-		return false;
-	}
-
-	unsigned int* pData = new unsigned int[width * height];//bgra
-	CGrayConvert::Gray_2_Bgr32(pGray, width, height, format, pData);
-	Utils_SaveBufToFile(pData, width * height * sizeof(pData[0]), (const char*)pFile, false);
-	SAFE_DELETE_ARRY(pData);
-
-	return true;
-
-}
-static bool SaveGray_2_U16(void* pGray, const UINT32 width, const UINT32 height, const GRAY_FORMAT format, char* pFile)
-{
-	if ((NULL == pGray) || (0 >= width) || (0 >= height) || (NULL == pFile))
-	{
-		return false;
-	}
-
-	unsigned short* pData = new unsigned short[width * height];//U16
-	CGrayConvert::Gray_2_U16(pGray, width, height, format, pData);
-	Utils_SaveBufToFile(pData, width * height * sizeof(pData[0]), (const char*)pFile, false);
-	SAFE_DELETE_ARRY(pData);
-
-	return true;
-
-}
-
-bool TofGray2U8(void* pGrayData, const UINT32 width, const UINT32 height, const GRAY_FORMAT format, void ** pOutGrayU8)
-{
-	if ((NULL == pGrayData) || (0 >= width) || (0 >= height) )
-	{
-		return false;
-	}
-	unsigned char* pData = new unsigned char[width * height];  // U8
-	CGrayConvert::Gray_2_U8(pGrayData, width, height, format, pData);
-	*pOutGrayU8 = (void*)pData;
-}
-
-static bool SaveGray_2_U8(void* pGray, const UINT32 width, const UINT32 height, const GRAY_FORMAT format, char* pFile)
-{
-	if ((NULL == pGray) || (0 >= width) || (0 >= height) || (NULL == pFile))
-	{
-		return false;
-	}
-
-	unsigned char* pData = new unsigned char[width * height];//U8
-	CGrayConvert::Gray_2_U8(pGray, width, height, format, pData);
-	Utils_SaveBufToFile(pData, width * height * sizeof(pData[0]), (const char*)pFile, false);
-	SAFE_DELETE_ARRY(pData);
-
-	return true;
-
 }
 
 static bool SaveDepthText(float* pDepthData, const UINT32 width, const UINT32 height, char* pTxtFile, const bool bWH)
@@ -999,13 +608,10 @@ static void CaptureTofFrame(const std::string& strDir, const std::string& strTof
 	}
 
 	//
-	if (NULL != tofFrameData->pGrayData)
+	if (NULL != tofFrameData->pu8GrayData)
 	{
-		sprintf(szFile, "%s/%s-%u-Gray.%s", strDir.c_str(), strTofName.c_str(), nCaptureIndex, StringGrayFormat(tofFrameData->grayFormat));
-		Utils_SaveBufToFile(tofFrameData->pu16GrayData, nPixelCnt * CaculateGrayPixelBytes(tofFrameData->grayFormat), szFile, false);
-
-		//sprintf(szFile, "%s/%u-Gray.u8", strDir.c_str(), nCaptureIndex);
-		//SaveGray_2_U8(tofFrameData->pGrayData, tofFrameData->frameWidth, tofFrameData->frameHeight, tofFrameData->grayFormat, szFile);
+		sprintf(szFile, "%s/%u-Gray.u8", strDir.c_str(), nCaptureIndex);
+		Utils_SaveBufToFile(tofFrameData->pu8GrayData, nPixelCnt * sizeof(tofFrameData->pu8GrayData[0]), szFile, false);
 	}
 	//
 	/*
@@ -1030,56 +636,6 @@ typedef struct tagSunnyFullDepthData
 	unsigned char* u8Intensity;
 	unsigned short* u16Confidence;
 }SunnyFullDepthData;
-
-//安克客户MTP013时候额外需要的数据
-typedef struct tagAnkerMtp013CustomExtData
-{
-	float* pConfidence;
-	float* intensity;
-}AnkerMtp013CustomExtData;
-
-static void SunnyConciseDepthDataGet(TofModDepthData *tofFrameData, SunnyConciseDepthData *depthData)
-{
-	const UINT32 pixle_cnt = tofFrameData->frameWidth * tofFrameData->frameHeight;
-
-	//u16Depth
-	for (UINT32 pos = 0; pos < pixle_cnt; pos++)
-	{
-		depthData->u16Depth[pos] = tofFrameData->pPointData[pos].z * 1000 + 0.5;
-	}
-
-	//u8Gray
-	CGrayConvert::Gray_2_U8(tofFrameData->pGrayData, tofFrameData->frameWidth, tofFrameData->frameHeight, tofFrameData->grayFormat, depthData->u8Gray);
-
-}
-
-static void SunnyFullDepthDataGet(TofModDepthData *tofFrameData, SunnyFullDepthData *depthData)
-{
-	const UINT32 pixle_cnt = tofFrameData->frameWidth * tofFrameData->frameHeight;
-
-	//u16Depth
-	for (UINT32 pos = 0; pos < pixle_cnt; pos++)
-	{
-		depthData->u16Depth[pos] = tofFrameData->pPointData[pos].z * 1000 + 0.5;
-	}
-
-	//u8Gray
-	CGrayConvert::Gray_2_U8(tofFrameData->pGrayData, tofFrameData->frameWidth, tofFrameData->frameHeight, tofFrameData->grayFormat, depthData->u8Gray);
-
-	if ((NULL != tofFrameData->pExtData) && (sizeof(AnkerMtp013CustomExtData) == tofFrameData->nExtDataLen))
-	{	
-		AnkerMtp013CustomExtData* pExt = (AnkerMtp013CustomExtData*)(tofFrameData->pExtData);
-
-		//u8Intensity, u16Confidence
-		for (UINT32 pos = 0; pos < pixle_cnt; pos++)
-		{
-			depthData->u8Intensity[pos]   = ((255 > pExt->intensity[pos]) ? pExt->intensity[pos] : 255);//超过255取255,否则强转
-			depthData->u16Confidence[pos] = ((0 > pExt->pConfidence[pos]) ? 0 : (pExt->pConfidence[pos] * 1000));//小于0取0,否则放大1000倍强转
-		}
-	}
-
-}
-
 
 void HandleDepthData(const UINT32 threadIndex, UINT32 frameIndex, std::string& strSaveDir, std::string strTofName, TOF_DEPTH_DATA_INFO_S* tofFrameData)
 {
@@ -1238,6 +794,18 @@ static void CaptureTofRgbdOutputData(const std::string& strDir, const unsigned i
 		}
 	}
 
+	if (NULL != rgbdData->depth2rgb.pData)
+	{
+		TofRgbdImage_Float& tmp = rgbdData->depth2rgb;
+		const unsigned int nPixelCnt = tmp.nWidth * tmp.nHeight;
+
+		printf("111 tmp.nWidth = %u, tmp.nHeight = %u\n", tmp.nWidth, tmp.nHeight);
+		sprintf(szFile, "%s/%u-depth2rgb.dat", strDir.c_str(), nCaptureIndex);
+		Utils_SaveBufToFile(rgbdData->depth2rgb.pData, nPixelCnt  * sizeof(rgbdData->depth2rgb.pData[0]), szFile, false);
+
+		sprintf(szFile, "%s/%u-depth2rgb.txt", strDir.c_str(), nCaptureIndex);
+		SaveDepthText(rgbdData->depth2rgb.pData, tmp.nWidth, tmp.nHeight, szFile, false);
+	}
 
 	//
 	if (1)
@@ -1310,9 +878,25 @@ static void AlsoCanGetOrSetSomeParam(HTOFM hTofMod, TofModuleCaps* pCaps)
 	//}
 }
 
-static void GetOrSetSomeParam(HTOFM hTofMod, TofModuleCaps* pCaps, const TOF_MODE tofMode)
+static void GetOrSetSomeParam(HTOFM hTofMod, TofModuleCapability* pCaps)
 {
 	TOFRET retVal = TOFRET_ERROR_OTHER;
+
+	if (pCaps->bTofHDRZSupported)
+	{
+		if (TOFRET_SUCCESS != (retVal = TOFM_SetTofHDRZ(hTofMod, true)))
+		{
+			printf("TOFM_SetTofHDRZ failed, retVal=0x%08x.\n", retVal);
+		}
+	}
+
+	if (pCaps->bTofRemoveINSSupported)
+	{
+		if (TOFRET_SUCCESS != (retVal = TOFM_SetTofRemoveINS(hTofMod, true)))
+		{
+			printf("TOFM_SetTofRemoveINS failed, retVal=0x%08x.\n", retVal);
+		}
+	}
 
 	for (UINT32 i = 0; i < 32; i++)
 	{
@@ -1325,22 +909,8 @@ static void GetOrSetSomeParam(HTOFM hTofMod, TofModuleCaps* pCaps, const TOF_MOD
 			}
 		}
 	}
-
-	if (pCaps->bTofRemoveINSSupported)
-	{
-		bool bEnable = false;
-		if ((TOF_MODE_HDRZ_5FPS == tofMode) || (TOF_MODE_HDRZ_10FPS == tofMode)
-			|| (TOF_MODE_HDRZ_15FPS == tofMode) || (TOF_MODE_HDRZ_30FPS == tofMode)
-			|| (TOF_MODE_HDRZ_45FPS == tofMode) || (TOF_MODE_HDRZ_60FPS == tofMode))
-		{	//注意：目前只有17相位的才调试过效果，所以开放，其他相位的效果没调试过，所以不开放
-			bEnable = true;
-		}
-		if (TOFRET_SUCCESS != (retVal = TOFM_SetTofRemoveINS(hTofMod, bEnable)))
-		{
-			printf("TOFM_SetTofRemoveINS (%d) failed, retVal=0x%08x.\n", bEnable, retVal);
-		}
-	}
 }
+
 
 static void PrintfSomeCalibParam(SomeCalibParam* pParamOut)
 {
@@ -1465,6 +1035,7 @@ int TofDepthSdkInit(DEPTH_HANDLE_CB_S *pstDepthHandleCb, char *pcCalibDataPath, 
 	TOFRET retVal = TOFRET_ERROR_OTHER;
 	TofModuleCaps stTofModuleCaps;
 	CBuf calibData(512 * 1024);//不能少于128K,，一般不超过128K
+	TofModuleCapability* pCaps = NULL; //表明指定模式下的能力
 
 	if (!pstDepthHandleCb || !pcCalibDataPath || !pHalUserData)
 	{
@@ -1493,6 +1064,15 @@ int TofDepthSdkInit(DEPTH_HANDLE_CB_S *pstDepthHandleCb, char *pcCalibDataPath, 
 		return -1;
 	}
 
+	for (UINT32 i = 0; i < stTofModuleCaps.capCnt; i++)
+	{
+		if (tofMode == stTofModuleCaps.cap[i].tofMode)
+		{
+			pCaps = &(stTofModuleCaps.cap[i]);
+			break;
+		}
+	}
+
 	// 可自行指定配置文件名，为空则使用默认配置文件
 	const std::string strCfgFile = ("");	
 	
@@ -1505,21 +1085,12 @@ int TofDepthSdkInit(DEPTH_HANDLE_CB_S *pstDepthHandleCb, char *pcCalibDataPath, 
 
 	//2. 从设备读取标定数据，可以备份着
 	{
-		//const UINT32 nCalibDataLen = TOFM_ReadCalibData(hTofMod, calibData.GetBuf(), calibData.GetBufLen());
 		if (!ReadFile(strCalibFile, calibData))
 		{
 			printf("ReadCalibData failed.\n");
 			remove(pcCalibDataPath);
 			goto errExitCloseDev;
 		}
-	}
-
-	//3. 加载并解析标定数据，可以是之前备份着的标定数据
-	if (TOFRET_SUCCESS != (retVal = TOFM_LoadCalibData(hTofMod, calibData.GetBuf(), calibData.GetDataLen())))
-	{
-		printf("TOFM_LoadCalibData failed, retVal=0x%08x.\n", retVal);
-		remove(pcCalibDataPath);
-		goto errExitCloseDev;
 	}
 
 	//4. 这时候可以读取一些标定参数出来备份着
@@ -1531,17 +1102,17 @@ int TofDepthSdkInit(DEPTH_HANDLE_CB_S *pstDepthHandleCb, char *pcCalibDataPath, 
 
 	//深度计算模块（该部分必须在TOFM_LoadCalibData之后，TOFM_UnLoadCalibData之前调用）
 	//5. 初始化深度计算模块
-	if (TOFRET_SUCCESS != (retVal = TOFM_InitDepthCal(hTofMod)))//(比较耗时)
+	if (TOFRET_SUCCESS != (retVal = TOFM_InitDepthCal(hTofMod, calibData.GetBuf(), calibData.GetDataLen())))//(比较耗时)
 	{
 		printf("TOFM_InitDepthCal failed, retVal=0x%08x.\n", retVal);
-		goto errExitUnLoadCalibData;
+		goto errExitCloseDev;
 	}
 
 	//7. 一般在开流之后，可按需获取/修改参数
-	GetOrSetSomeParam(hTofMod, &stTofModuleCaps, tofMode);////ae 、 滤波
+	GetOrSetSomeParam(hTofMod, pCaps);////ae 、 滤波
 
 	// 7.1 记录支持的滤波类型
-	pstDepthHandleCb->uiSupportedTofFilter = stTofModuleCaps.supportedTOFFilter;
+	pstDepthHandleCb->uiSupportedTofFilter = pCaps->supportedTOFFilter;
 
 	//8. 曝光处理设置
 	ExterntionHooks stHooks;
@@ -1550,15 +1121,10 @@ int TofDepthSdkInit(DEPTH_HANDLE_CB_S *pstDepthHandleCb, char *pcCalibDataPath, 
 	stHooks.RecvTofExpTime = Sunny_RecvTofExpTime;
 	TOFM_SetExterntionHooks(hTofMod, &stHooks);
 	
-	TofExpouseRangeItems stExpRangeItems;
-	stExpRangeItems.nIndex = 2;
-	TOFM_GetTofExpTimeRange(hTofMod, &stExpRangeItems);
-	printf("max_AEF[%u], max_FEF[%u]\n", stExpRangeItems.uParam.g2.max_AEF, stExpRangeItems.uParam.g2.max_FEF);
-
 	/* Create set tof exp thread */
 	pstDepthHandleCb->stTofSetExp.flag = STOP_SETUP_EXP;
-	pthread_create(&pstDepthHandleCb->stTofExpPid, NULL, Sunny_SetTofEXP, pstDepthHandleCb);
 	pstDepthHandleCb->isExpTrdRunning = 1;
+	pthread_create(&pstDepthHandleCb->stTofExpPid, NULL, Sunny_SetTofEXP, pstDepthHandleCb);
 
 	pstDepthHandleCb->hTofMod = hTofMod;
 
@@ -1568,10 +1134,6 @@ int TofDepthSdkInit(DEPTH_HANDLE_CB_S *pstDepthHandleCb, char *pcCalibDataPath, 
 errExitUnInitDepthCal:
 	//10. 回收深度计算模块
 	retVal = TOFM_UnInitDepthCal(hTofMod);
-
-errExitUnLoadCalibData:
-	//11. 卸载之前导入并解析的标定数据，否则会内存泄漏
-	retVal = TOFM_UnLoadCalibData(hTofMod);
 
 errExitCloseDev:
 	//12. 关闭模组.......
@@ -1596,9 +1158,6 @@ int TofDepthSdkUnInit(DEPTH_HANDLE_CB_S *pstDepthHandleCb)
 	{
 		//10. 回收深度计算模块
 		retVal = TOFM_UnInitDepthCal(pstDepthHandleCb->hTofMod);
-
-		//11. 卸载之前导入并解析的标定数据，否则会内存泄漏
-		retVal = TOFM_UnLoadCalibData(pstDepthHandleCb->hTofMod);
 
 		//12. 关闭模组.......
 		retVal = TOFM_CloseDevice(pstDepthHandleCb->hTofMod);
@@ -1643,73 +1202,19 @@ int TofDepthProcess(void *pCamHandle, IMAGE_DATA_INFO_S *pstTofRawDataInfo, TOF_
 		return -1;
 	}
 
-	pstTofDepthDataInfo->timeStamp 		= pstTofRawDataInfo->timeStamp;
-	pstTofDepthDataInfo->uiFrameCnt		= pstTofRawDataInfo->uiFrameCnt;
-	pstTofDepthDataInfo->frameWidth 	= stTofDepthData.frameWidth;
-	pstTofDepthDataInfo->frameHeight 	= stTofDepthData.frameHeight;
-	pstTofDepthDataInfo->pDepthData		= stTofDepthData.pDepthData;
-	pstTofDepthDataInfo->pfPointData 	= stTofDepthData.pPointData;
-	pstTofDepthDataInfo->grayFormat		= stTofDepthData.grayFormat;
-	pstTofDepthDataInfo->pGrayData		= stTofDepthData.pGrayData;
-
-	pstTofDepthDataInfo->pu16GrayData	= NULL;
-	pstTofDepthDataInfo->pu16Confidence = NULL;
-	pstTofDepthDataInfo->pfNoise 		= NULL;
-
+	pstTofDepthDataInfo->timeStamp 			= pstTofRawDataInfo->timeStamp;
+	pstTofDepthDataInfo->uiFrameCnt			= pstTofRawDataInfo->uiFrameCnt;
+	pstTofDepthDataInfo->frameWidth 		= stTofDepthData.frameWidth;
+	pstTofDepthDataInfo->frameHeight 		= stTofDepthData.frameHeight;
+	pstTofDepthDataInfo->pDepthData			= stTofDepthData.pDepthData;
+	pstTofDepthDataInfo->pfPointData 		= stTofDepthData.pPointData;
+	pstTofDepthDataInfo->pPointDataUnfilter = stTofDepthData.pPointDataUnfilter;
+	pstTofDepthDataInfo->pu8GrayData		= stTofDepthData.pGrayData;
+	pstTofDepthDataInfo->pu16Confidence 	= NULL;
+	pstTofDepthDataInfo->pfNoise 			= NULL;
+	
 	return 0;
 }
-
-
-
-int TofDepthProcessExp(void *pCamHandle, IMAGE_DATA_INFO_S *pstTofRawDataInfo, TOF_DEPTH_DATA_INFO_S *pstTofDepthDataInfo, int iDepthHandleIndex)
-{
-	TOFRET retVal = TOFRET_ERROR_OTHER;
-	int i;
-	unsigned int uiPixelNum = 0;
-	float fConfidence = 0;
-	TofRawData stRawData;
-	TofModDepthData stTofDepthData;
-	camera_handle *pstTofHandle;
-	DEPTH_HANDLE_CB_S *pstDepthHandleCb;
-
-	memset(&stRawData, 0, sizeof(stRawData));
-	memset(&stTofDepthData, 0, sizeof(stTofDepthData));
-
-	stRawData.nRawLen = pstTofRawDataInfo->uiImageSize;
-	stRawData.pRaw = pstTofRawDataInfo->pucImageData;
-
-	if (!pCamHandle || !pstTofRawDataInfo || !pstTofDepthDataInfo)
-	{
-		printf("[%s] NULL ptr!\n", __func__);
-		return -1;
-	}
-
-	pstTofHandle = (camera_handle*)pCamHandle;
-	pstDepthHandleCb = &pstTofHandle->stDepthHandleCb[iDepthHandleIndex];
-
-	retVal = TOFM_DoDepthCal(pstDepthHandleCb->hTofMod, &stRawData, &stTofDepthData);
-	if (TOFRET_SUCCESS != retVal)
-	{
-		printf("TOFM_DoDepthCal failed, retVal=0x%08x.\n", retVal);
-		return -1;
-	}
-
-	pstTofDepthDataInfo->timeStamp 		= pstTofRawDataInfo->timeStamp;
-	pstTofDepthDataInfo->uiFrameCnt		= pstTofRawDataInfo->uiFrameCnt;
-	pstTofDepthDataInfo->frameWidth 	= stTofDepthData.frameWidth;
-	pstTofDepthDataInfo->frameHeight 	= stTofDepthData.frameHeight;
-	pstTofDepthDataInfo->pDepthData		= stTofDepthData.pDepthData;
-	pstTofDepthDataInfo->pfPointData 	= stTofDepthData.pPointData;
-	pstTofDepthDataInfo->grayFormat		= stTofDepthData.grayFormat;
-	pstTofDepthDataInfo->pGrayData		= stTofDepthData.pGrayData;
-
-	pstTofDepthDataInfo->pu16GrayData	= NULL;
-	pstTofDepthDataInfo->pu16Confidence = NULL;
-	pstTofDepthDataInfo->pfNoise 		= NULL;
-
-	return 0;
-}
-
 
 #ifdef RGBD
 static void PrintfLensParameter(TofRgbdLensParameter* pTofLens)
@@ -1763,10 +1268,8 @@ int TofRgbdSdkInit(HTOFRGBD *ppstRgbdHandle, const char *pcRgbdCalibPath)
 
 	const unsigned int nTofWidth = RAW_WIDTH;//TOF数据宽
 	const unsigned int nTofHeight = ACTIVE_HEIGHT;//TOF数据高
-	const unsigned int nRgbWidth = RGB_WIDTH;//RGB数据宽
-	const unsigned int nRgbHeight = RGB_HEIGHT;//RGB数据高
-
-	const TofRgbd_Gray_Format inGrayFormat = TofRgbd_Gray_Format_Float;//输入的灰度格式
+	const unsigned int nRgbWidth = RGB_VPS_OUT_WIDTH;//RGB数据宽
+	const unsigned int nRgbHeight = RGB_VPS_OUT_HEIGHT;//RGB数据高
 
 	if (!ppstRgbdHandle || !pcRgbdCalibPath)
 	{
@@ -1797,8 +1300,6 @@ int TofRgbdSdkInit(HTOFRGBD *ppstRgbdHandle, const char *pcRgbdCalibPath)
 
 	struInputParam.nRgbWidth = nRgbWidth;
 	struInputParam.nRgbHeight = nRgbHeight;
-
-	struInputParam.inGrayFormat = inGrayFormat;
 
 	HTOFRGBD hTofRgbd = TOFRGBD_CreateHandle(&struInputParam);
 	if (NULL == hTofRgbd)

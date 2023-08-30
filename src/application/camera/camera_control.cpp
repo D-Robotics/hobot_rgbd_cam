@@ -4,7 +4,7 @@
 #include "camera_control.h"
 #include "tof_depth_process.h"
 // #include "v4l2_capture.h"
-#include "camera_hb_cfg.h"
+#include "camera_cfg.h"
 
 
 #define TOF_CALIB_OFFSET		(0x2100)
@@ -59,7 +59,7 @@ static char str_removeINS_name[128] = {0};////标定文件路径
 static unsigned char p_tof_eeprom_double[128*1024+RINS_FILE_SIZE] = {0};
 
 
-unsigned long long get_tick_count()
+static unsigned long long get_tick_count()
 {
 	unsigned long long tick = 0;
 
@@ -528,6 +528,27 @@ int data_convert(unsigned char* data,unsigned char* buffer_out,unsigned int num)
 }
 
 
+void raw_data_rotation(uint16_t* raw, uint16_t width, uint16_t height, uint16_t headline, uint16_t frames)
+{
+	uint32_t frame_len = width * height;
+	uint32_t valid_frame_len = width * (height - headline);
+	uint32_t half_valid_frame_len = valid_frame_len / 2;
+	uint32_t frame_last_pixel_index = valid_frame_len - 1;
+	uint32_t row_len = width;
+
+	for (uint16_t frame_index = 0; frame_index < frames; frame_index++)
+	{
+		uint16_t* tmp_raw = raw + frame_index * frame_len + row_len;
+		for (uint16_t pixel_index = 0; pixel_index < half_valid_frame_len; ++pixel_index)
+		{
+			uint16_t tmp_pixel = tmp_raw[pixel_index];
+			tmp_raw[pixel_index] = tmp_raw[frame_last_pixel_index - pixel_index];
+			tmp_raw[frame_last_pixel_index - pixel_index] = tmp_pixel;
+		}
+	}
+}
+
+
 int GetImageData(void *pHandle, IMAGE_DATA_INFO_S *pstImageDataInfo)
 {
 	int iRet = 0;
@@ -600,6 +621,8 @@ int GetImageData(void *pHandle, IMAGE_DATA_INFO_S *pstImageDataInfo)
 
 		pstImageDataInfo->pucImageData = au8RawBuffer;
 		pstImageDataInfo->uiImageSize = pstImageDataInfo->uiImageSize*4/3;
+
+		//raw_data_rotation((unsigned short*)pstImageDataInfo->pucImageData, 224, 129, 1, 17);
 	#else
 		if ((CAM_TYPE_TOF == pstCameraHandler->eCamType) || (CAM_TYPE_TOF_RGBD == pstCameraHandler->eCamType))
 		{
@@ -732,6 +755,31 @@ int GetTofFilterStatus(void *pCamHandle, unsigned int *puiEnableTypeList, unsign
 	return 0;
 }
 
+int GetRgbdCalibData(void *pCamHandle, unsigned char *pu8CalibData, unsigned int *pu32CalibDataSize)
+{
+	unsigned int u32ReadSize = 0;
+	camera_handle *pstCameraHandler;
+	FILE *pFile;
+
+	if (!pCamHandle || !pu8CalibData || !pu32CalibDataSize)
+	{
+		printf("[%s] NULL ptr!\n", __func__);
+		return -1;
+	}
+	pstCameraHandler = (camera_handle*)pCamHandle;
+
+	pFile = fopen(pstCameraHandler->acRgbdCalibDataPath, "rb");
+	if (!pFile) {
+		printf("open %s failed\n", pstCameraHandler->acRgbdCalibDataPath);
+		return -1;
+	}
+
+	u32ReadSize = fread(pu8CalibData, 1, RGBD_CALIB_SIZE, pFile);
+	*pu32CalibDataSize = u32ReadSize;
+
+	fclose(pFile);
+	return 0;
+}
 
 int SetTofFilterStatus(void *pCamHandle, unsigned int *puiEnableTypeList, unsigned int *puiDisableTypeList)
 {
@@ -896,8 +944,9 @@ void *OpenCamera(CAM_PARAM_S *pstCamParam)
 		pstHbVideoDev->pipeId = pstHbVinVpssInit->pipeId;
 		pstHbVideoDev->mipiIdx = pstHbVinVpssInit->mipiIdx;
 
-		pstHbVideoDev->iNeedIsp = 1;
-		pstHbVideoDev->iNeedInitVenc = 1;
+		pstHbVideoDev->iNeedIsp = RGB_HB_MPP_CFG_ISP_ENABLE;
+		pstHbVideoDev->iNeedInitVps = RGB_HB_MPP_CFG_VPS_ENABLE;
+		pstHbVideoDev->iNeedInitVenc = RGB_HB_MPP_CFG_VENC_ENABLE;
 	}
 
 	iRet = hb_video_init(pstHbVideoDev);
@@ -1100,7 +1149,7 @@ int CameraStreamON(void *pCamHandle)
 
 	if (!pCamHandle)
 	{
-		printf("[%s-%d] hb_set_fps failed\n", __func__, __LINE__);
+		printf("[%s-%d] NULL Ptr\n", __func__, __LINE__);
 		return -1;
 	}
 
@@ -1167,9 +1216,10 @@ int CameraStreamOFF(void *pCamHandle)
 
 	if (!pCamHandle)
 	{
-		printf("[%s-%d] hb_set_fps failed\n", __func__, __LINE__);
+		printf("[%s-%d] NULL Ptr\n", __func__, __LINE__);
 		return -1;
 	}
+	pstCameraHandler = (camera_handle*)pCamHandle;
 
 #ifdef HORIZON_PLATFORM
 	HB_VIDEO_DEV_S *pstHbVideoDev = &pstCameraHandler->stHbVideoDev;
