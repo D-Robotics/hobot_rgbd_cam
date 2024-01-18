@@ -319,7 +319,7 @@ void RgbdNode::timer_ros_pub()
           img_dep_->header.stamp.nanosec = time_start.tv_nsec;
           img_dep_->width = oResTofPCL.mOriRes.frameWidth;
           img_dep_->height = oResTofPCL.mOriRes.frameHeight;
-          img_dep_->step = oResTofPCL.mOriRes.frameWidth;
+          img_dep_->step = oResTofPCL.mOriRes.frameWidth * 2;
           img_dep_->encoding = sensor_msgs::image_encodings::TYPE_16UC1;
           img_dep_->data.resize(oResTofPCL.mOriRes.frameWidth *
                                 oResTofPCL.mOriRes.frameHeight * 2);
@@ -355,7 +355,7 @@ void RgbdNode::timer_ros_pub()
           img_clr_->header.stamp = img_dep_->header.stamp;
           img_clr_->width = ImgYuv.width;
           img_clr_->height = ImgYuv.height;
-          img_clr_->step = ImgYuv.width;
+          img_clr_->step = ImgYuv.width * 3;
           img_clr_->data.resize(ImgYuv.size * 2);
           memcpy(&img_clr_->data[0], oResTofPCL.mOutRgb, img_clr_->data.size());
           imgClr_pub_->publish(*img_clr_);
@@ -412,7 +412,7 @@ void RgbdNode::timer_hbmem_pub()
             msg.time_stamp.nanosec = time_start.tv_nsec;
             msg.width = ImgDepth.width;
             msg.height = nDepthHeight;
-            msg.step = ImgDepth.width;
+            msg.step = ImgDepth.width * 2;
             msg.data_size = nDepthSz;
             memcpy(msg.data.data(), ImgDepth.pucImageData + nDepthSz *9, nDepthSz);
             pub_hbmemdepth_->publish(std::move(loanedepthMsg));
@@ -454,7 +454,7 @@ void RgbdNode::timer_hbmem_pub()
             msg.time_stamp.nanosec = time_start.tv_nsec;
             msg.width = ImgYuv.width;
             msg.height = ImgYuv.height;
-            msg.step = ImgYuv.width;
+            msg.step = ImgYuv.width * 3;
             msg.data_size = ImgYuv.size * 2;
             memcpy(msg.data.data(), oResTofPCL.mOutRgb, msg.data_size);
             pub_hbmem1080P_->publish(std::move(loaned1080Msg));
