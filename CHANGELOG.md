@@ -1,5 +1,9 @@
 # Changelog for package rgbd_sensor
 
+tros_2.0.3 (2024-1-18)
+------------------
+1. 更新image step的不对齐问题。
+
 tros_2.0.2 (2023-12-22)
 ------------------
 1. 更新package.xml，解决arm平台打包失败问题。
