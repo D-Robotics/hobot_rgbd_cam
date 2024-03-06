@@ -58,6 +58,9 @@ RgbdNode::RgbdNode(const rclcpp::NodeOptions & node_options, std::string node_na
   camera_calibration_info_(new sensor_msgs::msg::CameraInfo())
 {
   stop_ = false;
+  std::string tros_distro
+      = std::string(std::getenv("TROS_DISTRO")? std::getenv("TROS_DISTRO") : "");
+  camera_calibration_file_path_ = "/opt/tros/" + tros_distro + "/lib/rgbd_sensor/config/CP3AM_calibration.yaml";
   get_params();
   init();  //外部可能会调用了
   RCLCPP_WARN(rclcpp::get_logger("rgbd_node"),

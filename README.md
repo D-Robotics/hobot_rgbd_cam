@@ -91,7 +91,7 @@ hbm_img_msgs pkg是在hobot_msgs中自定义的图片消息格式，用于shared
 | infra_height  |  模组输出灰度图像高      |         108                 |         108           |
 | infra_fps     |  模组输出灰度图像帧率    |         10                   |         10            |
 | enable_infra  |  是否发布灰度图像        |         True/False          |         True          |
-| camera_calibration_file_path  | 相机标定文件的存放路径  | 根据实际的相机标定文件存放路径配置  | /opt/tros/lib/rgbd_sensor/config/CP3AM_calibration.yaml |
+| camera_calibration_file_path  | 相机标定文件的存放路径  | 根据实际的相机标定文件存放路径配置  | /opt/tros/${TROS_DISTRO}/lib/rgbd_sensor/config/CP3AM_calibration.yaml |
 
 目前舜宇模组，只能输出 1080P 的标定，所以图像参数目前没有什么实际效果，都是默认值。
 发布主题包括：
@@ -124,7 +124,7 @@ hbmem_infra
 
  3：读取相机内参文件失败时，会出现无法发布相机内参的警告，但不影响rgbd_sensor的其他功能
 
- 4：相机标定文件的读取路径默认为：/opt/tros/lib/rgbd_sensor/config/CP3AM_calibration.yaml，请确认文件路径正确，相机内参发布话题名为：/rgbd_CP3AM/color/camera_info
+ 4：相机标定文件的读取路径默认为：/opt/tros/${TROS_DISTRO}/lib/rgbd_sensor/config/CP3AM_calibration.yaml，请确认文件路径正确，相机内参发布话题名为：/rgbd_CP3AM/color/camera_info
 ## X3 Ubuntu系统
 用户直接调用ros2 命令启动即可：
 

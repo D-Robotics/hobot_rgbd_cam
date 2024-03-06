@@ -14,9 +14,17 @@
 
 from launch import LaunchDescription
 from launch_ros.actions import Node
-
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+from ament_index_python.packages import get_package_prefix
+import os
 
 def generate_launch_description():
+    config_file_path = os.path.join(
+        get_package_prefix('rgbd_sensor'),
+        "lib/rgbd_sensor/config/CP3AM_calibration.yaml")
+    print("config_file_path is ", config_file_path)
+
     return LaunchDescription([
         # 启动图片发布pkg
         Node(
@@ -24,7 +32,7 @@ def generate_launch_description():
             executable='rgbd_sensor',
             output='screen',
             parameters=[
-                {"camera_calibration_file_path": "/opt/tros/lib/rgbd_sensor/config/CP3AM_calibration.yaml"},
+                {"camera_calibration_file_path": str(config_file_path)},
                 {"io_method": "ros"}
             ],
             arguments=['--ros-args', '--log-level', 'error']

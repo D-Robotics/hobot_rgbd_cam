@@ -1,5 +1,9 @@
 # Changelog for package rgbd_sensor
 
+tros_2.0.4 (2024-3-6)
+------------------
+1. 配置文件路径由`/opt/tros/lib`变更为`/opt/tros/${TROS_DISTRO}/lib`。
+
 tros_2.0.3 (2024-1-18)
 ------------------
 1. 更新image step的不对齐问题。
