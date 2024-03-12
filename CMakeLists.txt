@@ -26,15 +26,12 @@ if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   add_compile_options(-Wall -Wextra -Wpedantic)
 endif()
 add_compile_options(-w)
-if(BUILD_HBMEM)
-add_definitions(-DUSING_HBMEM)
 find_package(hbm_img_msgs REQUIRED)
-endif()
 
 find_package(ament_cmake_auto REQUIRED)
 ament_auto_find_build_dependencies()
 
-add_definitions(-std=c++11 -DRGBD -DHORIZON_PLATFORM -DCV_CONVERT_CLR)
+add_definitions(-DRGBD -DHORIZON_PLATFORM -DCV_CONVERT_CLR)
 
 ## pkg-config libraries
 find_package(ament_cmake REQUIRED)
@@ -42,6 +39,7 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(yaml_cpp_vendor REQUIRED)
+find_package(std_srvs REQUIRED)
 
 include_directories(include
   src/TOF_SDK/include
@@ -104,15 +102,11 @@ ament_target_dependencies(
   ${PROJECT_NAME}
   rclcpp
   sensor_msgs
+  hbm_img_msgs
   OpenCV
   yaml_cpp_vendor
+  std_srvs
   )
-
-if(BUILD_HBMEM)
-target_link_libraries(${PROJECT_NAME}
-  hbmem
-)
-endif()
 
 # Install executables
 install(

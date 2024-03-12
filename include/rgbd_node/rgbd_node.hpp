@@ -17,12 +17,10 @@
 
 #include <rclcpp/rclcpp.hpp>
 
-// #include <vector>
 #include <memory>
 #include <string>
 
 #include "sensor_msgs/image_encodings.hpp"
-// #include "sensor_msgs/msg/compressed_image.hpp"
 
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/camera_info.hpp"
@@ -32,11 +30,9 @@
 #include <std_msgs/msg/string.hpp>
 #include "rgbd_node/rgbd_cam.hpp"
 
-#ifdef USING_HBMEM
 #include "hb_mem_mgr.h"
 #include "hbm_img_msgs/msg/hbm_msg480_p.hpp"
 #include "hbm_img_msgs/msg/hbm_msg1080_p.hpp"
-#endif
 /*
 发布：
 depth
@@ -97,11 +93,9 @@ class RgbdNode : public rclcpp::Node
     TTofRgb_PCDClr &pclRgbDepth, struct timespec time_start);
   void pub_ori_pcl(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr camPublish,
     TofDepth_Info &pclDepth, struct timespec time_start);
-#ifdef USING_HBMEM
-  rclcpp::PublisherHbmem<hbm_img_msgs::msg::HbmMsg1080P>::SharedPtr pub_hbmem1080P_;
-  rclcpp::PublisherHbmem<hbm_img_msgs::msg::HbmMsg480P>::SharedPtr pub_hbmemdepth_;
-  rclcpp::PublisherHbmem<hbm_img_msgs::msg::HbmMsg480P>::SharedPtr pub_hbmeminfra_;
-#endif
+  rclcpp::Publisher<hbm_img_msgs::msg::HbmMsg1080P>::SharedPtr pub_hbmem1080P_;
+  rclcpp::Publisher<hbm_img_msgs::msg::HbmMsg480P>::SharedPtr pub_hbmemdepth_;
+  rclcpp::Publisher<hbm_img_msgs::msg::HbmMsg480P>::SharedPtr pub_hbmeminfra_;
 
  private:
   std::string _sensor_type = "CP3AM";

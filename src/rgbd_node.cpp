@@ -20,6 +20,7 @@
 #include <string>
 #include <memory>
 #include <stdarg.h>
+#include <fstream>
 
 extern "C" int ROS_printf(int nLev, char *fmt, ...)
 {
@@ -187,21 +188,19 @@ void RgbdNode::exec_loopPub()
       imgClr_pub_ = this->create_publisher<sensor_msgs::msg::Image>(tsTopicName, BUF_PUB_NUM);
     }
   } else {
-#ifdef USING_HBMEM
     // 创建hbmempub
     if (_enable_clr) {
-      pub_hbmem1080P_ = this->create_publisher_hbmem<hbm_img_msgs::msg::HbmMsg1080P>(
+      pub_hbmem1080P_ = this->create_publisher<hbm_img_msgs::msg::HbmMsg1080P>(
         "hbmem_img", BUF_PUB_NUM);
     }
     if (_enable_dep) {
-      pub_hbmemdepth_ = this->create_publisher_hbmem<hbm_img_msgs::msg::HbmMsg480P>(
+      pub_hbmemdepth_ = this->create_publisher<hbm_img_msgs::msg::HbmMsg480P>(
         "hbmem_depth", BUF_PUB_NUM);
     }
     if (_enable_infra) {
-      pub_hbmeminfra_ = this->create_publisher_hbmem<hbm_img_msgs::msg::HbmMsg480P>(
+      pub_hbmeminfra_ = this->create_publisher<hbm_img_msgs::msg::HbmMsg480P>(
         "hbmem_infra", BUF_PUB_NUM);
     }
-#endif
     bSharedMem = true;
   }
   if (_enabled_read_cam_calibration) {
@@ -390,7 +389,6 @@ void RgbdNode::timer_ros_pub()
 }
 void RgbdNode::timer_hbmem_pub()
 {
-#ifdef USING_HBMEM
   if (ShyCam::GetInstance()->is_capturing()) {
     TShyFrame ImgDepth;
     if (ShyCam::GetInstance()->GetDepthFrame(ImgDepth)) {
@@ -487,6 +485,5 @@ void RgbdNode::timer_hbmem_pub()
       ShyCam::GetInstance()->ReleasePair();
     }
   }
-#endif
 }
 }  // namespace rgbd_node
