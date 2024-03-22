@@ -17,6 +17,9 @@ from launch_ros.actions import Node
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from ament_index_python.packages import get_package_prefix
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
+from ament_index_python import get_package_share_directory
 import os
 
 def generate_launch_description():
@@ -26,6 +29,13 @@ def generate_launch_description():
     print("config_file_path is ", config_file_path)
 
     return LaunchDescription([
+        # 启动零拷贝环境配置node
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(
+                    get_package_share_directory('hobot_shm'),
+                    'launch/hobot_shm.launch.py'))
+        ),
         # 启动图片发布pkg
         Node(
             package='rgbd_sensor',
