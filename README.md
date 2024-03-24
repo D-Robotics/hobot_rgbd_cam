@@ -1,54 +1,50 @@
+English| [简体中文](./README_cn.md)
+
 # Getting Started with rgbd_sensor Node
 ---
 # Intro
 ---
-通过阅读本文档，用户可以在地平线X3开发板上轻松抓取 mipi 深度摄像头的视频流数据，并通过ROS平台发布满足ROS标准的深度图数据/灰度图数据/RGB图像数据/相机内参，还有经过运算后的点云数据，供其他ROS Node订阅获取，可以在 rviz 上观看实时效果。支持 share mem 方式发布。
+By reading this document, users can easily capture the video stream data of the MIPI depth camera on the Horizon X3 development board and publish depth map data/ grayscale image data/ RGB image data/ camera intrinsics that meet ROS standards, as well as computed point cloud data on the ROS platform for other ROS Nodes to subscribe and view real-time effects on rviz. Supports shared memory publishing.
 
 # Build
 ---
 ## Dependency
 
-依赖库：
-ros package：
+Dependencies:
+ROS package:
 - sensor_msgs
 - hbm_img_msgs
 
-hbm_img_msgs pkg是在hobot_msgs中自定义的图片消息格式，用于shared mem场景下的图片传输。
+The hbm_img_msgs package is a custom image message format in hobot_msgs, used for image transmission in shared memory scenarios.
 
-## 开发环境
-- 编程语言：C/C++
-- 开发平台：X3/X86
-- 系统版本：Ubuntu 20.04
-- 编译工具链：Linux GCC 9.3.0/Linaro GCC 9.3.0
-## package说明
+## Development Environment
+- Programming Language: C/C++
+- Development Platform: X3/X86
+- System Version: Ubuntu 20.04
+- Compilation Toolchain: Linux GCC 9.3.0/ Linaro GCC 9.3.0
+## Package Description
 ---
-源码包含 rgbd_sensor package。rgbd_sensor 编译完成后，头文件、动态库以及依赖安装在install/rgbd_sensor 路径。
+The source code includes the rgbd_sensor package. After compiling rgbd_sensor, the header files, dynamic libraries, and dependencies are installed in the install/rgbd_sensor path.
 
-## 编译
-支持在X3 Ubuntu系统上编译和在PC上使用docker交叉编译两种方式，并支持通过编译选项控制编译pkg的依赖和pkg的功能。
+## Compilation
+Supports two methods for compilation: compiling on an X3 Ubuntu system and cross-compiling using docker on a PC, and supports controlling the dependencies and functions of the compiled pkg through compilation options.
 
-### X3 Ubuntu系统上编译
-1、编译环境确认
+### Compilation on X3 Ubuntu System
+1. Compilation Environment Verification
+- X3 Ubuntu system is installed on the board.
+- The current compilation terminal has set up the TogetherROS environment variables: `source PATH/setup.bash`, where PATH is the installation path of TogetherROS.
+- ROS2 build tool colcon is installed, installation command: `pip install -U colcon-common-extensions`
+- Dependendencies are installed, detailed in the Dependency section
 
-- 板端已安装X3 Ubuntu系统。
-- 当前编译终端已设置TogetherROS环境变量：`source PATH/setup.bash`。其中PATH为TogetherROS的安装路径。
-- 已安装ROS2编译工具colcon，安装命令：`pip install -U colcon-common-extensions`
-- 已依赖pkg ，详见 Dependency 部分
+2. Compilation:
+   `colcon build --packages-select rgbd_sensor`.
 
-2、编译：
-  `colcon build --packages-select rgbd_sensor`。
+### Docker Cross-Compilation
+1. Compilation Environment Verification
+- Compilation in docker, with tros already installed in docker. Details on docker installation, cross-compilation instructions, tros compilation, and deployment can be found in the README.md in the robot development platform robot_dev_config repo.
+- hbm_img_msgs package has been compiled (compilation method in the Dependency section)
 
-
-### docker交叉编译
-
-1、编译环境确认
-
-- 在docker中编译，并且docker中已经安装好tros。docker安装、交叉编译说明、tros编译和部署说明详见机器人开发平台 robot_dev_config repo中的README.md。
-- 已编译 hbm_img_msgs package（编译方法见Dependency部分）
-
-2、编译
-
-- 编译命令： 
+2. Compilation- Compilation Command:
 
   ```
   export TARGET_ARCH=aarch64
@@ -61,72 +57,68 @@ hbm_img_msgs pkg是在hobot_msgs中自定义的图片消息格式，用于shared
      --cmake-args \
      --no-warn-unused-cli \
      -DCMAKE_TOOLCHAIN_FILE=`pwd`/robot_dev_config/aarch64_toolchainfile.cmake
-  
   ```
-
 
 # Usage
 
-## 目前参数列表：
+## Current Parameter List:
 
-| 参数名      | 含义                 | 取值                          | 默认值                |
-| ----------- | -------------------- | ----------------------------- | --------------------- |
-| sensor_type   | 设备类型            | 字符串，目前只支持舜宇 CP3AM    |      CP3AM               |
-| io_method     | 输出数据传输的方式   | ros/shared_mem               |      ros               |
-| color_width   |  模组输出图像宽      |         1920                 |         1920           |
-| color_height  |  模组输出图像高      |         1080                 |         1080           |
-| color_fps     |  模组输出图像帧率    |         10                   |         10            |
-| enable_color  |  是否发布图像        |         True/False          |         True          |
-| color_width   |  模组输出图像宽      |         1920                 |         1920           |
-| color_height  |  模组输出图像高      |         1080                 |         1080           |
-| color_fps     |  模组输出图像帧率    |         10                   |         10            |
-| enable_color  |  是否发布图像        |         True/False          |         True          |
-| depth_width   |  模组输出深度图像宽      |         224                 |         224           |
-| depth_height  |  模组输出深度图像高      |         129                 |         129           |
-| depth_fps     |  模组输出深度图像帧率    |         10                   |         10            |
-| enable_depth  |  是否发布深度图像        |         True/False          |         True          |
-| enable_pointcloud  |  是否发布点云        |         True/False          |         True          |
-| enable_aligned_pointcloud  |  是否发布标定点云        |         True/False          |         True          |
-| infra_width   |  模组输出灰度图像宽      |         224                 |         224           |
-| infra_height  |  模组输出灰度图像高      |         108                 |         108           |
-| infra_fps     |  模组输出灰度图像帧率    |         10                   |         10            |
-| enable_infra  |  是否发布灰度图像        |         True/False          |         True          |
-| camera_calibration_file_path  | 相机标定文件的存放路径  | 根据实际的相机标定文件存放路径配置  | /opt/tros/${TROS_DISTRO}/lib/rgbd_sensor/config/CP3AM_calibration.yaml |
+| Parameter Name   | Meaning              | Value Options                                   | Default Value        |
+| ---------------- | -------------------- | ---------------------------------------------- | --------------------- |
+| sensor_type      | Device Type          | String, currently only supports Sunplus CP3AM  | CP3AM                 |
+| io_method        | Output Data Transfer Method | ros/shared_mem                              | ros                   |
+| color_width      | Module Output Image Width     | 1920                                           | 1920                  |
+| color_height     | Module Output Image Height    | 1080                                           | 1080                  |
+| color_fps        | Module Output Image Frame Rate | 10                                           | 10                    |
+| enable_color     | Enable Image Publishing        | True/False                                     | True                  |
+| depth_width      | Module Output Depth Image Width | 224                                          | 224                   |
+| depth_height     | Module Output Depth Image Height | 129                                          | 129                   |
+| depth_fps        | Module Output Depth Image Frame Rate | 10                                      | 10                    |
+| enable_depth     | Enable Depth Image Publishing   | True/False                                     | True                  |
+| enable_pointcloud | Enable Point Cloud Publishing  | True/False                                     | True                  |
+| enable_aligned_pointcloud | Enable Aligned Point Cloud Publishing | True/False                        | True                  |
+| infra_width      | Module Output Infrared Image Width | 224                                          | 224                   |
+| infra_height     | Module Output Infrared Image Height | 108                                          | 108                   |
+| infra_fps        | Module Output Infrared Image Frame Rate | 10                                      | 10                    |
+| enable_infra     | Enable Infrared Image Publishing | True/False                                    | True                  |
+| camera_calibration_file_path | Path to Camera Calibration File | Set according to the actual path of the camera calibration file | /opt/tros/${TROS_DISTRO}/lib/rgbd_sensor/config/CP3AM_calibration.yaml |
 
-目前舜宇模组，只能输出 1080P 的标定，所以图像参数目前没有什么实际效果，都是默认值。
-发布主题包括：
+Currently, Sunplus modules can only output 1080P calibration, so the image parameters have no practical effect, all using default values.
+Published topics include:
 ```
 #ros
-#深度图
+#depth image
+``````
 /rgbd_CP3AM/depth/image_rect_raw
-#点云
+# Point Cloud
 /rgbd_CP3AM/depth/color/points
-#标定点云
+# Calibrated Point Cloud
 /rgbd_CP3AM/aligned_depth_to_color/color/points
-#灰度图
+# Grayscale Image
 /rgbd_CP3AM/infra/image_rect_raw
-#颜色图
+# Color Image
 /rgbd_CP3AM/color/image_rect_raw
-#相机内参
+# Camera Parameters
 /rgbd_CP3AM/color/camera_info
-#shared mem:
-#颜色图
+# shared mem:
+# Color Image
 hbmem_img
-#深度图
+# Depth Image
 hbmem_depth
-#灰度图
+# Grayscale Image
 hbmem_infra
-```
-## 注意：
- 1：在当前目录 cp -r install/${PKG_NAME}/lib/${PKG_NAME}/parameter/ .，其中 ${PKG_NAME} 为具体的package名。
 
- 2：需要把校准库 install/lib/libgc2053_linear.so 拷贝到：/lib/sensorlib/
+## Note:
+1: In the current directory cp -r install/${PKG_NAME}/lib/${PKG_NAME}/parameter/ ., where ${PKG_NAME} is the specific package name.
 
- 3：读取相机内参文件失败时，会出现无法发布相机内参的警告，但不影响rgbd_sensor的其他功能
+2: The calibration library install/lib/libgc2053_linear.so needs to be copied to: /lib/sensorlib/
 
- 4：相机标定文件的读取路径默认为：/opt/tros/${TROS_DISTRO}/lib/rgbd_sensor/config/CP3AM_calibration.yaml，请确认文件路径正确，相机内参发布话题名为：/rgbd_CP3AM/color/camera_info
-## X3 Ubuntu系统
-用户直接调用ros2 命令启动即可：
+3: If reading camera parameters file fails, a warning about unable to publish camera parameters will appear, but it does not affect other functions of rgbd_sensor.
+
+4: The default path for camera calibration file is: /opt/tros/${TROS_DISTRO}/lib/rgbd_sensor/config/CP3AM_calibration.yaml. Please make sure the file path is correct, and the topic name for camera parameters publication is: /rgbd_CP3AM/color/camera_info
+
+## X3 Ubuntu System
+Users can simply start by calling ros2 command:
 
 ```
 export COLCON_CURRENT_PREFIX=./install
@@ -134,34 +126,31 @@ source ./install/local_setup.sh
 
 ros2 run rgbd_sensor rgbd_sensor
 ```
-传参数方式：
+
+Passing arguments example:
 `ros2 run rgbd_sensor rgbd_sensor --ros-args --log-level info --ros-args -p io_method:=ros`
 
-
-运行方式2，使用launch文件启动：
+Another way to run is using launch file:
 `ros2 launch install/share/rgbd_sensor/launch/rgbd_sensor.launch.py`
 
-## X3 linaro系统
-
-把在docker 交叉编译的install 目录拷贝到linaro 系统下，例如:/userdata
-需要首先指定依赖库的路径，例如：
+## X3 Linaro System
+Copy the install directory compiled in docker to the Linaro system, for example: /userdata
+First, specify the path for dependent libraries, for example:
 `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/userdata/install/lib`
-
-
-修改 ROS_LOG_DIR 的路径，否则会创建在 /home 目录下，需要执行 mount -o remount,rw /，才可以在 /home 下创建日志
+```Please modify the path of ROS_LOG_DIR, otherwise it will be created under the /home directory, you need to execute "mount -o remount,rw /" to be able to create logs under /home.
 `export ROS_LOG_DIR=/userdata/`
 
-运行 rgbd_sensor
+Run rgbd_sensor
 ```
-// 默认参数方式
+// Default parameter method
 /userdata/install/lib/rgbd_sensor/rgbd_sensor
-// 传参方式
+// Parameter passing method
 #/userdata/install/lib/rgbd_sensor/rgbd_sensor --ros-args -p io_method:=ros
 
 ```
-# 结果分析
-## X3结果展示
-相机运行正常并成功发布相机内参，则输出以下信息
+# Result analysis
+## X3 result display
+If the camera runs normally and successfully publishes camera parameters, the following information will be output
 ```
 [INFO] [1662470301.451981102] [rgbd_node]: [pub_ori_pcl]->pub pcl w:h=24192:1,nIdx-24192:sz=24192.
 [INFO] [1662470301.461459373] [rgbd_node]: [timer_ros_pub]->pub dep w:h=224:129,sz=982464, infra w:h=224:108, sz=24192.
@@ -188,5 +177,5 @@ ros2 run rgbd_sensor rgbd_sensor
 [INFO] [1662470302.014477201] [rgbd_node]: publish camera info.
 ```
 
-## rviz2 观看效果
-安装：apt install ros-foxy-rviz-common ros-foxy-rviz-default-plugins ros-foxy-rviz2
+## View the effect in rviz2
+Install: apt install ros-foxy-rviz-common ros-foxy-rviz-default-plugins ros-foxy-rviz2
