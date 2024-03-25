@@ -21,6 +21,8 @@
 #include <memory>
 #include <stdarg.h>
 #include <fstream>
+#include "rcpputils/env.hpp"
+#include "rcutils/env.h"
 
 extern "C" int ROS_printf(int nLev, char *fmt, ...)
 {
@@ -188,6 +190,22 @@ void RgbdNode::exec_loopPub()
       imgClr_pub_ = this->create_publisher<sensor_msgs::msg::Image>(tsTopicName, BUF_PUB_NUM);
     }
   } else {
+    std::string ros_zerocopy_env = rcpputils::get_env_var("RMW_FASTRTPS_USE_QOS_FROM_XML");
+    if (ros_zerocopy_env.empty()) {
+      RCLCPP_ERROR_STREAM(this->get_logger(),
+        "Launching with zero-copy, but env of `RMW_FASTRTPS_USE_QOS_FROM_XML` is not set. "
+        << "Transporting data without zero-copy!");
+    } else {
+      if ("1" == ros_zerocopy_env) {
+        RCLCPP_WARN_STREAM(this->get_logger(), "Enabling zero-copy");
+      } else {
+        RCLCPP_ERROR_STREAM(this->get_logger(),
+          "env of `RMW_FASTRTPS_USE_QOS_FROM_XML` is [" << ros_zerocopy_env
+          << "], which should be set to 1. "
+          << "Data transporting without zero-copy!");
+      }
+    }
+
     // 创建hbmempub
     if (_enable_clr) {
       pub_hbmem1080P_ = this->create_publisher<hbm_img_msgs::msg::HbmMsg1080P>(
