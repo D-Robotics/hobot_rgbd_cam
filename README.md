@@ -88,7 +88,6 @@ Published topics include:
 ```
 #ros
 #depth image
-``````
 /rgbd_CP3AM/depth/image_rect_raw
 # Point Cloud
 /rgbd_CP3AM/depth/color/points
@@ -107,6 +106,7 @@ hbmem_img
 hbmem_depth
 # Grayscale Image
 hbmem_infra
+```
 
 ## Note:
 1: In the current directory cp -r install/${PKG_NAME}/lib/${PKG_NAME}/parameter/ ., where ${PKG_NAME} is the specific package name.
@@ -137,7 +137,8 @@ Another way to run is using launch file:
 Copy the install directory compiled in docker to the Linaro system, for example: /userdata
 First, specify the path for dependent libraries, for example:
 `export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/userdata/install/lib`
-```Please modify the path of ROS_LOG_DIR, otherwise it will be created under the /home directory, you need to execute "mount -o remount,rw /" to be able to create logs under /home.
+
+Please modify the path of ROS_LOG_DIR, otherwise it will be created under the /home directory, you need to execute "mount -o remount,rw /" to be able to create logs under /home.
 `export ROS_LOG_DIR=/userdata/`
 
 Run rgbd_sensor
@@ -146,8 +147,8 @@ Run rgbd_sensor
 /userdata/install/lib/rgbd_sensor/rgbd_sensor
 // Parameter passing method
 #/userdata/install/lib/rgbd_sensor/rgbd_sensor --ros-args -p io_method:=ros
-
 ```
+
 # Result analysis
 ## X3 result display
 If the camera runs normally and successfully publishes camera parameters, the following information will be output
