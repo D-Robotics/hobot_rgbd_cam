@@ -24,6 +24,8 @@
 #include "rcpputils/env.hpp"
 #include "rcutils/env.h"
 
+#define BUF_PUB_NUM 5
+
 extern "C" int ROS_printf(int nLev, char *fmt, ...)
 {
   char buf[512] = { 0 };
@@ -48,7 +50,6 @@ extern "C" int ROS_printf(int nLev, char *fmt, ...)
   va_end(args);
   return 0;
 }
-#define BUF_PUB_NUM 5
 
 namespace rgbd_node
 {
@@ -209,15 +210,15 @@ void RgbdNode::exec_loopPub()
     // 创建hbmempub
     if (_enable_clr) {
       pub_hbmem1080P_ = this->create_publisher<hbm_img_msgs::msg::HbmMsg1080P>(
-        "hbmem_img", BUF_PUB_NUM);
+        "hbmem_img", rclcpp::SensorDataQoS());
     }
     if (_enable_dep) {
       pub_hbmemdepth_ = this->create_publisher<hbm_img_msgs::msg::HbmMsg480P>(
-        "hbmem_depth", BUF_PUB_NUM);
+        "hbmem_depth", rclcpp::SensorDataQoS());
     }
     if (_enable_infra) {
       pub_hbmeminfra_ = this->create_publisher<hbm_img_msgs::msg::HbmMsg480P>(
-        "hbmem_infra", BUF_PUB_NUM);
+        "hbmem_infra", rclcpp::SensorDataQoS());
     }
     bSharedMem = true;
   }
