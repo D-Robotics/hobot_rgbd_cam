@@ -4,7 +4,7 @@ English| [简体中文](./README_cn.md)
 ---
 # Intro
 ---
-By reading this document, users can easily capture the video stream data of the MIPI depth camera on the Horizon X3 development board and publish depth map data/ grayscale image data/ RGB image data/ camera intrinsics that meet ROS standards, as well as computed point cloud data on the ROS platform for other ROS Nodes to subscribe and view real-time effects on rviz. Supports shared memory publishing.
+By reading this document, users can easily capture the video stream data of the MIPI depth camera on the RDK X3 development board and publish depth map data/ grayscale image data/ RGB image data/ camera intrinsics that meet ROS standards, as well as computed point cloud data on the ROS platform for other ROS Nodes to subscribe and view real-time effects on rviz. Supports shared memory publishing.
 
 # Build
 ---

@@ -4,7 +4,7 @@
   <name>rgbd_sensor</name>
   <version>2.1.0</version>
   <description>A TogetheROS Driver for rgbd Cameras</description>
-  <maintainer email="zhuo.wang@horizon.ai">zhuo</maintainer>
+  <maintainer email="zhuo.wang@d-robotics.cc">zhuo</maintainer>
   <license>Apache License 2.0</license>
 
   <buildtool_depend>ament_cmake_auto</buildtool_depend>
